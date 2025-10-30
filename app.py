@@ -1,4 +1,4 @@
-# app.py - HISTÓRICO DE FUNCIONÁRIOS (EXATO COMO NA IMAGEM)
+# app.py - LISTA DE FUNCIONÁRIOS COM CHECKBOX INDIVIDUAL (PERFEITO)
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -199,9 +199,9 @@ else:
         # Botões no topo
         col_btn1, col_btn2 = st.columns([1, 1])
         with col_btn1:
-            btn_senha = st.button("Alterar Senha", key="btn_senha")
+            btn_senha = st.button("Alterar Senha", disabled=True, key="btn_senha_disabled")
         with col_btn2:
-            btn_nivel = st.button("Alterar Nível", key="btn_nivel")
+            btn_nivel = st.button("Alterar Nível", disabled=True, key="btn_nivel_disabled")
 
         df = listar_usuarios()
         if df.empty:
@@ -211,52 +211,62 @@ else:
             if 'selected_id' not in st.session_state:
                 st.session_state.selected_id = None
 
-            # Tabela com checkbox
-            data = []
-            for _, row in df.iterrows():
-                checked = st.checkbox("", key=f"chk_{row['id']}", value=(st.session_state.selected_id == row['id']))
+            # Tabela com checkbox individual
+            selected_row = None
+            for idx, row in df.iterrows():
+                cols = st.columns([0.6, 2.5, 3, 2, 1.5, 1.5])
+                checked = cols[0].checkbox("", key=f"chk_{row['id']}", value=(st.session_state.selected_id == row['id']))
+                
+                # Destacar linha selecionada
+                style = "background-color: #f0f2f6;" if checked else ""
+                with st.container():
+                    st.markdown(f"""
+                    <div style="padding: 8px; border-radius: 8px; {style}">
+                        <strong>{row['nome']}</strong> | {row['email']} | {row['data_cadastro']} | {row['senha']} | <strong>{row['nivel'].title()}</strong>
+                    </div>
+                    """, unsafe_allow_html=True)
+
                 if checked:
                     st.session_state.selected_id = row['id']
-                    st.session_state.selected_email = row['email']
-                    st.session_state.selected_nome = row['nome']
-                    st.session_state.selected_nivel = row['nivel']
-                data.append([
-                    checked,
-                    row['nome'],
-                    row['email'],
-                    row['data_cadastro'],
-                    row['senha'],
-                    row['nivel'].title()
-                ])
+                    selected_row = row
+                    # Habilitar botões
+                    st.session_state.btn_senha = True
+                    st.session_state.btn_nivel = True
+                else:
+                    if st.session_state.selected_id == row['id']:
+                        st.session_state.selected_id = None
 
-            # Criar DataFrame para exibição
-            display_df = pd.DataFrame(data, columns=["", "NOME", "E-MAIL", "DATA CADASTRO", "SENHA", "NÍVEL"])
-            st.dataframe(display_df.set_index(""), use_container_width=True)
+            # Atualizar estado dos botões
+            st.session_state.btn_senha = st.session_state.selected_id is not None
+            st.session_state.btn_nivel = st.session_state.selected_id is not None
 
-            # Ações
-            if btn_senha and st.session_state.selected_id:
-                with st.form("form_alterar_senha"):
-                    st.write(f"**Alterar senha de:** {st.session_state.selected_nome}")
-                    nova_senha = st.text_input("Nova Senha", type="password")
-                    if st.form_submit_button("Salvar Nova Senha"):
-                        if nova_senha:
-                            alterar_senha(st.session_state.selected_email, nova_senha)
-                            st.success("Senha atualizada com sucesso!")
-                            st.rerun()
-                        else:
-                            st.error("Digite uma senha!")
+            # Re-renderizar botões com estado correto
+            col_btn1, col_btn2 = st.columns([1, 1])
+            with col_btn1:
+                if st.button("Alterar Senha", disabled=not st.session_state.btn_senha):
+                    if selected_row:
+                        with st.form("form_senha"):
+                            st.write(f"**Alterar senha de:** {selected_row['nome']}")
+                            nova_senha = st.text_input("Nova Senha", type="password")
+                            if st.form_submit_button("Salvar"):
+                                if nova_senha:
+                                    alterar_senha(selected_row['email'], nova_senha)
+                                    st.success("Senha atualizada!")
+                                    st.rerun()
+                                else:
+                                    st.error("Digite uma senha!")
+            with col_btn2:
+                if st.button("Alterar Nível", disabled=not st.session_state.btn_nivel):
+                    if selected_row:
+                        with st.form("form_nivel"):
+                            st.write(f"**Alterar nível de:** {selected_row['nome']}")
+                            novo_nivel = st.selectbox("Nível", ["operador", "admin"], 
+                                                    index=0 if selected_row['nivel'] == 'operador' else 1)
+                            if st.form_submit_button("Salvar"):
+                                alterar_nivel(selected_row['email'], novo_nivel)
+                                st.success("Nível atualizado!")
+                                st.rerun()
 
-            if btn_nivel and st.session_state.selected_id:
-                with st.form("form_alterar_nivel"):
-                    st.write(f"**Alterar nível de:** {st.session_state.selected_nome}")
-                    novo_nivel = st.selectbox("Novo Nível", ["operador", "admin"], 
-                                            index=0 if st.session_state.selected_nivel == "operador" else 1)
-                    if st.form_submit_button("Salvar Novo Nível"):
-                        alterar_nivel(st.session_state.selected_email, novo_nivel)
-                        st.success("Nível atualizado com sucesso!")
-                        st.rerun()
-
-            # Download CSV
             st.download_button(
                 "Baixar Lista (CSV)",
                 df[['nome', 'email', 'senha', 'nivel', 'data_cadastro']].to_csv(index=False).encode('utf-8'),
