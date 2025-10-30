@@ -1,4 +1,4 @@
-# app.py - FSJ com HISTÓRICO + ALTERAR SENHA + NÍVEL
+# app.py - FSJ com GRID + CHECKBOX + AÇÕES NO TOPO
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -195,35 +195,55 @@ else:
 
     elif opcao == "Histórico de Cadastro de Funcionários" and st.session_state.nivel == "admin":
         st.header("Histórico de Cadastro de Funcionários")
+
         df = listar_usuarios()
-        if not df.empty:
+        if df.empty:
+            st.info("Nenhum funcionário cadastrado ainda.")
+        else:
+            # Estado para checkbox
+            if 'selected_user' not in st.session_state:
+                st.session_state.selected_user = None
+
+            # Grid com checkbox
+            st.write("### Lista de Funcionários")
+            selected_rows = []
             for _, row in df.iterrows():
-                col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1.5, 2, 1.5, 1.5])
-                col1.write(f"**{row['nome']}**")
-                col2.write(f"`{row['email']}`")
-                col3.write(f"**{row['nivel'].title()}**")
-                col4.write(f"{row['data_cadastro']}")
-                
-                # BOTÃO ALTERAR SENHA
-                if st.button("Senha", key=f"senha_{row['id']}"):
-                    with st.form(f"form_senha_{row['id']}"):
-                        nova_senha = st.text_input("Nova Senha", type="password", key=f"ns_{row['id']}")
-                        if st.form_submit_button("Salvar Senha"):
-                            if nova_senha:
-                                alterar_senha(row['email'], nova_senha)
-                                st.success(f"Senha de **{row['email']}** atualizada!")
+                col_check, col_nome, col_email, col_nivel, col_data = st.columns([0.5, 2, 2.5, 1.5, 2])
+                checked = col_check.checkbox("", key=f"check_{row['id']}", value=(st.session_state.selected_user == row['id']))
+                if checked:
+                    st.session_state.selected_user = row['id']
+                    selected_rows = [row]
+                col_nome.write(f"**{row['nome']}**")
+                col_email.write(f"`{row['email']}`")
+                col_nivel.write(f"**{row['nivel'].title()}**")
+                col_data.write(row['data_cadastro'])
+
+            # Botões no topo
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                if st.button("Alterar Senha do Selecionado", disabled=len(selected_rows) != 1):
+                    if len(selected_rows) == 1:
+                        user = selected_rows[0]
+                        with st.form("form_senha"):
+                            nova_senha = st.text_input("Nova Senha", type="password")
+                            if st.form_submit_button("Salvar Senha"):
+                                if nova_senha:
+                                    alterar_senha(user['email'], nova_senha)
+                                    st.success(f"Senha de **{user['email']}** atualizada!")
+                                    st.rerun()
+                                else:
+                                    st.error("Digite uma senha!")
+
+            with col_btn2:
+                if st.button("Alterar Nível do Selecionado", disabled=len(selected_rows) != 1):
+                    if len(selected_rows) == 1:
+                        user = selected_rows[0]
+                        with st.form("form_nivel"):
+                            novo_nivel = st.selectbox("Novo Nível", ["operador", "admin"], index=0 if user['nivel'] == 'operador' else 1)
+                            if st.form_submit_button("Salvar Nível"):
+                                alterar_nivel(user['email'], novo_nivel)
+                                st.success(f"Nível de **{user['email']}** alterado para **{novo_nivel}**!")
                                 st.rerun()
-                            else:
-                                st.error("Digite uma senha!")
-                
-                # BOTÃO ALTERAR NÍVEL
-                if st.button("Nível", key=f"nivel_{row['id']}"):
-                    with st.form(f"form_nivel_{row['id']}"):
-                        novo_nivel = st.selectbox("Novo Nível", ["operador", "admin"], key=f"nn_{row['id']}")
-                        if st.form_submit_button("Salvar Nível"):
-                            alterar_nivel(row['email'], novo_nivel)
-                            st.success(f"Nível de **{row['email']}** alterado para **{novo_nivel}**!")
-                            st.rerun()
 
             st.markdown("---")
             st.download_button(
@@ -232,8 +252,6 @@ else:
                 "historico_funcionarios.csv",
                 "text/csv"
             )
-        else:
-            st.info("Nenhum funcionário cadastrado ainda.")
 
 st.markdown("---")
 st.markdown("*FSJ Logística - Sistema por Grok*")
