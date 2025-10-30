@@ -1,4 +1,4 @@
-# app.py - LISTA DE FUNCIONÁRIOS COM CHECKBOX INDIVIDUAL (PERFEITO)
+# app.py - LISTA DE FUNCIONÁRIOS: CHECKBOX ALINHADO + ESTILO PROFISSIONAL
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -199,9 +199,9 @@ else:
         # Botões no topo
         col_btn1, col_btn2 = st.columns([1, 1])
         with col_btn1:
-            btn_senha = st.button("Alterar Senha", disabled=True, key="btn_senha_disabled")
+            btn_senha = st.button("Alterar Senha", key="btn_senha", disabled=True)
         with col_btn2:
-            btn_nivel = st.button("Alterar Nível", disabled=True, key="btn_nivel_disabled")
+            btn_nivel = st.button("Alterar Nível", key="btn_nivel", disabled=True)
 
         df = listar_usuarios()
         if df.empty:
@@ -211,61 +211,83 @@ else:
             if 'selected_id' not in st.session_state:
                 st.session_state.selected_id = None
 
-            # Tabela com checkbox individual
-            selected_row = None
-            for idx, row in df.iterrows():
-                cols = st.columns([0.6, 2.5, 3, 2, 1.5, 1.5])
-                checked = cols[0].checkbox("", key=f"chk_{row['id']}", value=(st.session_state.selected_id == row['id']))
+            # Tabela com colunas fixas
+            st.write("### ")
+            for _, row in df.iterrows():
+                cols = st.columns([0.6, 2.8, 3.2, 2.2, 1.6, 1.4])
                 
-                # Destacar linha selecionada
-                style = "background-color: #f0f2f6;" if checked else ""
+                # Checkbox alinhado
+                checked = cols[0].checkbox("", key=f"chk_{row['id']}", 
+                                         value=(st.session_state.selected_id == row['id']))
+
+                # Destacar linha
+                bg_color = "#e6f7ff" if checked else "white"
+                border = "1px solid #ddd" if checked else "1px solid #eee"
+                
                 with st.container():
                     st.markdown(f"""
-                    <div style="padding: 8px; border-radius: 8px; {style}">
-                        <strong>{row['nome']}</strong> | {row['email']} | {row['data_cadastro']} | {row['senha']} | <strong>{row['nivel'].title()}</strong>
+                    <div style="
+                        display: flex; 
+                        align-items: center; 
+                        padding: 10px; 
+                        margin: 2px 0; 
+                        background-color: {bg_color};
+                        border: {border};
+                        border-radius: 8px;
+                        font-size: 14px;
+                    ">
+                        <div style="flex: 0.6; text-align: center;">&nbsp;</div>
+                        <div style="flex: 2.8; font-weight: bold;">{row['nome']}</div>
+                        <div style="flex: 3.2; color: #555;">{row['email']}</div>
+                        <div style="flex: 2.2; color: #777;">{row['data_cadastro']}</div>
+                        <div style="flex: 1.6; color: #d4380d;">{row['senha']}</div>
+                        <div style="flex: 1.4; font-weight: bold; color: #089e60;">{row['nivel'].title()}</div>
                     </div>
                     """, unsafe_allow_html=True)
 
                 if checked:
                     st.session_state.selected_id = row['id']
-                    selected_row = row
+                    st.session_state.selected_row = row
                     # Habilitar botões
-                    st.session_state.btn_senha = True
-                    st.session_state.btn_nivel = True
-                else:
-                    if st.session_state.selected_id == row['id']:
-                        st.session_state.selected_id = None
+                    st.rerun()
+                elif st.session_state.selected_id == row['id']:
+                    st.session_state.selected_id = None
+                    st.rerun()
 
-            # Atualizar estado dos botões
-            st.session_state.btn_senha = st.session_state.selected_id is not None
-            st.session_state.btn_nivel = st.session_state.selected_id is not None
+            # Habilitar botões
+            if st.session_state.selected_id:
+                st.session_state.btn_senha = True
+                st.session_state.btn_nivel = True
+            else:
+                st.session_state.btn_senha = False
+                st.session_state.btn_nivel = False
 
-            # Re-renderizar botões com estado correto
+            # Re-render botões
             col_btn1, col_btn2 = st.columns([1, 1])
             with col_btn1:
-                if st.button("Alterar Senha", disabled=not st.session_state.btn_senha):
-                    if selected_row:
-                        with st.form("form_senha"):
-                            st.write(f"**Alterar senha de:** {selected_row['nome']}")
-                            nova_senha = st.text_input("Nova Senha", type="password")
-                            if st.form_submit_button("Salvar"):
-                                if nova_senha:
-                                    alterar_senha(selected_row['email'], nova_senha)
-                                    st.success("Senha atualizada!")
-                                    st.rerun()
-                                else:
-                                    st.error("Digite uma senha!")
-            with col_btn2:
-                if st.button("Alterar Nível", disabled=not st.session_state.btn_nivel):
-                    if selected_row:
-                        with st.form("form_nivel"):
-                            st.write(f"**Alterar nível de:** {selected_row['nome']}")
-                            novo_nivel = st.selectbox("Nível", ["operador", "admin"], 
-                                                    index=0 if selected_row['nivel'] == 'operador' else 1)
-                            if st.form_submit_button("Salvar"):
-                                alterar_nivel(selected_row['email'], novo_nivel)
-                                st.success("Nível atualizado!")
+                if st.button("Alterar Senha", disabled=not getattr(st.session_state, 'btn_senha', False)):
+                    user = st.session_state.selected_row
+                    with st.form("form_senha"):
+                        st.write(f"**Alterar senha de:** {user['nome']}")
+                        nova_senha = st.text_input("Nova Senha", type="password")
+                        if st.form_submit_button("Salvar"):
+                            if nova_senha:
+                                alterar_senha(user['email'], nova_senha)
+                                st.success("Senha atualizada!")
                                 st.rerun()
+                            else:
+                                st.error("Digite uma senha!")
+            with col_btn2:
+                if st.button("Alterar Nível", disabled=not getattr(st.session_state, 'btn_nivel', False)):
+                    user = st.session_state.selected_row
+                    with st.form("form_nivel"):
+                        st.write(f"**Alterar nível de:** {user['nome']}")
+                        novo_nivel = st.selectbox("Nível", ["operador", "admin"], 
+                                                index=0 if user['nivel'] == 'operador' else 1)
+                        if st.form_submit_button("Salvar"):
+                            alterar_nivel(user['email'], novo_nivel)
+                            st.success("Nível atualizado!")
+                            st.rerun()
 
             st.download_button(
                 "Baixar Lista (CSV)",
