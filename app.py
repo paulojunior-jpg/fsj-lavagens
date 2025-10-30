@@ -1,4 +1,4 @@
-# app.py - FSJ com GRID + CHECKBOX + AÇÕES NO TOPO
+# app.py - HISTÓRICO DE FUNCIONÁRIOS (EXATO COMO NA IMAGEM)
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -194,62 +194,73 @@ else:
                     st.error("Preencha todos os campos!")
 
     elif opcao == "Histórico de Cadastro de Funcionários" and st.session_state.nivel == "admin":
-        st.header("Histórico de Cadastro de Funcionários")
+        st.header("Lista de Funcionários")
+
+        # Botões no topo
+        col_btn1, col_btn2 = st.columns([1, 1])
+        with col_btn1:
+            btn_senha = st.button("Alterar Senha", key="btn_senha")
+        with col_btn2:
+            btn_nivel = st.button("Alterar Nível", key="btn_nivel")
 
         df = listar_usuarios()
         if df.empty:
             st.info("Nenhum funcionário cadastrado ainda.")
         else:
-            # Estado para checkbox
-            if 'selected_user' not in st.session_state:
-                st.session_state.selected_user = None
+            # Estado para seleção
+            if 'selected_id' not in st.session_state:
+                st.session_state.selected_id = None
 
-            # Grid com checkbox
-            st.write("### Lista de Funcionários")
-            selected_rows = []
+            # Tabela com checkbox
+            data = []
             for _, row in df.iterrows():
-                col_check, col_nome, col_email, col_nivel, col_data = st.columns([0.5, 2, 2.5, 1.5, 2])
-                checked = col_check.checkbox("", key=f"check_{row['id']}", value=(st.session_state.selected_user == row['id']))
+                checked = st.checkbox("", key=f"chk_{row['id']}", value=(st.session_state.selected_id == row['id']))
                 if checked:
-                    st.session_state.selected_user = row['id']
-                    selected_rows = [row]
-                col_nome.write(f"**{row['nome']}**")
-                col_email.write(f"`{row['email']}`")
-                col_nivel.write(f"**{row['nivel'].title()}**")
-                col_data.write(row['data_cadastro'])
+                    st.session_state.selected_id = row['id']
+                    st.session_state.selected_email = row['email']
+                    st.session_state.selected_nome = row['nome']
+                    st.session_state.selected_nivel = row['nivel']
+                data.append([
+                    checked,
+                    row['nome'],
+                    row['email'],
+                    row['data_cadastro'],
+                    row['senha'],
+                    row['nivel'].title()
+                ])
 
-            # Botões no topo
-            col_btn1, col_btn2 = st.columns(2)
-            with col_btn1:
-                if st.button("Alterar Senha do Selecionado", disabled=len(selected_rows) != 1):
-                    if len(selected_rows) == 1:
-                        user = selected_rows[0]
-                        with st.form("form_senha"):
-                            nova_senha = st.text_input("Nova Senha", type="password")
-                            if st.form_submit_button("Salvar Senha"):
-                                if nova_senha:
-                                    alterar_senha(user['email'], nova_senha)
-                                    st.success(f"Senha de **{user['email']}** atualizada!")
-                                    st.rerun()
-                                else:
-                                    st.error("Digite uma senha!")
+            # Criar DataFrame para exibição
+            display_df = pd.DataFrame(data, columns=["", "NOME", "E-MAIL", "DATA CADASTRO", "SENHA", "NÍVEL"])
+            st.dataframe(display_df.set_index(""), use_container_width=True)
 
-            with col_btn2:
-                if st.button("Alterar Nível do Selecionado", disabled=len(selected_rows) != 1):
-                    if len(selected_rows) == 1:
-                        user = selected_rows[0]
-                        with st.form("form_nivel"):
-                            novo_nivel = st.selectbox("Novo Nível", ["operador", "admin"], index=0 if user['nivel'] == 'operador' else 1)
-                            if st.form_submit_button("Salvar Nível"):
-                                alterar_nivel(user['email'], novo_nivel)
-                                st.success(f"Nível de **{user['email']}** alterado para **{novo_nivel}**!")
-                                st.rerun()
+            # Ações
+            if btn_senha and st.session_state.selected_id:
+                with st.form("form_alterar_senha"):
+                    st.write(f"**Alterar senha de:** {st.session_state.selected_nome}")
+                    nova_senha = st.text_input("Nova Senha", type="password")
+                    if st.form_submit_button("Salvar Nova Senha"):
+                        if nova_senha:
+                            alterar_senha(st.session_state.selected_email, nova_senha)
+                            st.success("Senha atualizada com sucesso!")
+                            st.rerun()
+                        else:
+                            st.error("Digite uma senha!")
 
-            st.markdown("---")
+            if btn_nivel and st.session_state.selected_id:
+                with st.form("form_alterar_nivel"):
+                    st.write(f"**Alterar nível de:** {st.session_state.selected_nome}")
+                    novo_nivel = st.selectbox("Novo Nível", ["operador", "admin"], 
+                                            index=0 if st.session_state.selected_nivel == "operador" else 1)
+                    if st.form_submit_button("Salvar Novo Nível"):
+                        alterar_nivel(st.session_state.selected_email, novo_nivel)
+                        st.success("Nível atualizado com sucesso!")
+                        st.rerun()
+
+            # Download CSV
             st.download_button(
                 "Baixar Lista (CSV)",
                 df[['nome', 'email', 'senha', 'nivel', 'data_cadastro']].to_csv(index=False).encode('utf-8'),
-                "historico_funcionarios.csv",
+                "funcionarios.csv",
                 "text/csv"
             )
 
