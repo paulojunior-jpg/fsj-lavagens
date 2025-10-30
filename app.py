@@ -1,3 +1,4 @@
+# app.py - FSJ com CADASTRO + HISTÓRICO DE FUNCIONÁRIOS
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -13,7 +14,8 @@ def init_db():
         nome TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         senha TEXT NOT NULL,
-        nivel TEXT DEFAULT 'operador'
+        nivel TEXT DEFAULT 'operador',
+        data_cadastro TEXT
     )''')
     c.execute('''CREATE TABLE IF NOT EXISTS lavagens (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,8 +30,8 @@ def init_db():
         observacoes TEXT,
         usuario_criacao TEXT
     )''')
-    c.execute('INSERT OR IGNORE INTO usuarios (nome, email, senha, nivel) VALUES (?, ?, ?, ?)',
-              ('Admin FSJ', 'admin@fsj.com', 'fsj123', 'admin'))
+    c.execute('INSERT OR IGNORE INTO usuarios (nome, email, senha, nivel, data_cadastro) VALUES (?, ?, ?, ?, ?)',
+              ('Admin FSJ', 'admin@fsj.com', 'fsj123', 'admin', datetime.now().strftime('%d/%m/%Y %H:%M')))
     conn.commit()
     conn.close()
 
@@ -38,9 +40,10 @@ init_db()
 def criar_usuario(nome, email, senha, nivel):
     conn = sqlite3.connect('fsj_lavagens.db')
     c = conn.cursor()
+    data_cad = datetime.now().strftime('%d/%m/%Y %H:%M')
     try:
-        c.execute('INSERT INTO usuarios (nome, email, senha, nivel) VALUES (?, ?, ?, ?)',
-                  (nome, email, senha, nivel))
+        c.execute('INSERT INTO usuarios (nome, email, senha, nivel, data_cadastro) VALUES (?, ?, ?, ?, ?)',
+                  (nome, email, senha, nivel, data_cad))
         conn.commit()
         return True
     except:
@@ -56,15 +59,23 @@ def validar_login(email, senha):
     conn.close()
     return resultado
 
+def listar_usuarios():
+    conn = sqlite3.connect('fsj_lavagens.db')
+    df = pd.read_sql_query('SELECT nome, email, senha, nivel, data_cadastro FROM usuarios ORDER BY data_cadastro DESC', conn)
+    conn.close()
+    return df
+
 def emitir_ordem(placa, motorista, operacao, hora_inicio, hora_fim, obs, usuario):
     conn = sqlite3.connect('fsj_lavagens.db')
     c = conn.cursor()
     data_hoje = datetime.now().strftime('%Y-%m-%d')
-    contador = len(listar_lavagens()) + 1
+    c.execute('SELECT COUNT(*) FROM lavagens WHERE data = ?', (data_hoje,))
+    contador = c.fetchone()[0] + 1
     numero_ordem = f"ORD-{data_hoje.replace('-','')}-{contador:03d}"
     c.execute('''INSERT INTO lavagens 
     (numero_ordem, placa, motorista, operacao, data, hora_inicio, hora_fim, observacoes, status, usuario_criacao)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pendente', ?)''', (numero_ordem, placa.upper(), motorista, operacao, data_hoje, hora_inicio, hora_fim, obs, usuario))
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pendente', ?)''',
+    (numero_ordem, placa.upper(), motorista, operacao, data_hoje, hora_inicio, hora_fim, obs, usuario))
     conn.commit()
     conn.close()
     return numero_ordem
@@ -82,7 +93,7 @@ def atualizar_status(ordem, status):
     conn.commit()
     conn.close()
 
-st.title("🚛 FSJ Logística - Gerenciador de Lavagens")
+st.title("FSJ Logística - Gerenciador de Lavagens")
 
 if 'logado' not in st.session_state:
     st.session_state.logado = False
@@ -90,7 +101,7 @@ if 'logado' not in st.session_state:
     st.session_state.nivel = ""
 
 if not st.session_state.logado:
-    st.subheader("🔐 Faça Login")
+    st.subheader("Faça Login")
     col1, col2 = st.columns(2)
     email = col1.text_input("E-mail", placeholder="admin@fsj.com")
     senha = col2.text_input("Senha", type="password", placeholder="fsj123")
@@ -99,76 +110,91 @@ if not st.session_state.logado:
         if user:
             st.session_state.logado = True
             st.session_state.usuario, st.session_state.nivel = user
-            st.success(f"Bem-vindo, {user[0]}! 🎉")
+            st.success(f"Bem-vindo, {user[0]}!")
             st.rerun()
         else:
-            st.error("❌ E-mail ou senha incorretos")
-    st.info("👆 Dica: admin@fsj.com / fsj123")
+            st.error("E-mail ou senha incorretos.")
+    st.info("**Dica**: admin@fsj.com / fsj123")
 else:
-    st.sidebar.success(f"👤 Logado como: {st.session_state.usuario}")
-    st.sidebar.button("🚪 Sair", on_click=lambda: (setattr(st.session_state, 'logado', False), st.rerun()))
-    
+    st.sidebar.success(f"Logado como: {st.session_state.usuario}")
+    st.sidebar.button("Sair", on_click=lambda: (setattr(st.session_state, 'logado', False), st.rerun()))
+
+    # MENU
     opcoes = ["Emitir Nova Ordem", "Ver Histórico"]
     if st.session_state.nivel == "admin":
-        opcoes.append("👥 Cadastrar Novo Usuário")
-    opcao = st.sidebar.selectbox("📋 Escolha uma opção:", opcoes)
+        opcoes.extend(["Cadastrar Novo Usuário", "Histórico de Cadastro de Funcionários"])
+    opcao = st.sidebar.selectbox("Escolha uma opção:", opcoes)
 
     if opcao == "Emitir Nova Ordem":
-        st.header("📄 Emitir Ordem de Lavagem")
+        st.header("Emitir Ordem de Lavagem")
         with st.form("nova_ordem", clear_on_submit=True):
             col1, col2 = st.columns(2)
-            placa = col1.text_input("**Placa do Caminhão** (obrigatório)", placeholder="ABC-1234").upper()
+            placa = col1.text_input("**Placa** (obrigatório)").upper()
             motorista = col2.text_input("Motorista")
             operacao = st.text_input("Operação", placeholder="Ex: Carga/Descarga")
             col5, col6 = st.columns(2)
             hora_inicio = col5.time_input("Hora Início")
             hora_fim = col6.time_input("Hora Fim")
             obs = st.text_area("Observações")
-            if st.form_submit_button("🚀 Emitir Ordem", use_container_width=True):
+            if st.form_submit_button("Emitir Ordem"):
                 if placa:
-                    ordem_num = emitir_ordem(placa, motorista or "Não informado", operacao or "Geral",
-                                             str(hora_inicio) if hora_inicio else "", str(hora_fim) if hora_fim else "", obs, st.session_state.usuario)
-                    st.balloons()
-                    st.success(f"✅ Ordem emitida: **{ordem_num}**")
+                    ordem = emitir_ordem(placa, motorista or "Não informado", operacao or "Geral",
+                                       str(hora_inicio), str(hora_fim), obs, st.session_state.usuario)
+                    st.success(f"Ordem emitida: **{ordem}**")
                 else:
-                    st.error("❌ Placa obrigatória!")
+                    st.error("Placa obrigatória!")
 
     elif opcao == "Ver Histórico":
-        st.header("📊 Histórico de Lavagens")
-        col_f1, col_f2, col_f3 = st.columns(3)
-        filtro_placa = col_f1.text_input("🔍 Placa")
-        filtro_motorista = col_f2.text_input("🔍 Motorista")
-        filtro_status = col_f3.selectbox("Status", ["Todos", "Pendente", "Concluída"])
+        st.header("Histórico de Lavagens")
         df = listar_lavagens()
-        if filtro_placa:
-            df = df[df['placa'].str.contains(filtro_placa.upper(), na=False)]
-        if filtro_motorista:
-            df = df[df['motorista'].str.contains(filtro_motorista, case=False, na=False)]
-        if filtro_status != "Todos":
-            df = df[df['status'] == filtro_status]
         if not df.empty:
-            st.subheader(f"🗂️ {len(df)} registro(s)")
-            st.dataframe(df[['numero_ordem', 'placa', 'motorista', 'data', 'status']], use_container_width=True)
-            csv = df.to_csv(index=False)
-            st.download_button("📥 Baixar CSV", csv, "historico.csv", "text/csv")
+            for _, row in df.iterrows():
+                with st.container():
+                    col1, col2, col3 = st.columns([1, 3, 1])
+                    col1.metric("Ordem", row['numero_ordem'])
+                    col2.write(f"**{row['placa']}** | {row['motorista']} | {row['operacao']}")
+                    status = col3.selectbox("Status", ["Pendente", "Concluída"], 
+                                          index=0 if row['status'] == 'Pendente' else 1,
+                                          key=f"st_{row['numero_ordem']}")
+                    if status != row['status'] and st.button("Salvar", key=f"sv_{row['numero_ordem']}"):
+                        atualizar_status(row['numero_ordem'], status)
+                        st.success("Atualizado!")
+                        st.rerun()
+            st.download_button("Baixar CSV", df.to_csv(index=False), "lavagens.csv")
         else:
-            st.info("Nenhuma lavagem registrada.")
+            st.info("Nenhuma lavagem ainda.")
 
-    elif opcao == "👥 Cadastrar Novo Usuário":
-        st.header("👥 Cadastrar Novo Usuário (Apenas Mestre)")
-        with st.form("novo_usuario", clear_on_submit=True):
-            nome = st.text_input("Nome Completo *")
-            email = st.text_input("E-mail *", placeholder="joao@fsj.com")
-            senha = st.text_input("Senha *", type="password")
-            nivel = st.selectbox("Nível de Acesso", ["operador", "admin"])
+    elif opcao == "Cadastrar Novo Usuário" and st.session_state.nivel == "admin":
+        st.header("Cadastrar Novo Usuário")
+        with st.form("novo_usuario"):
+            nome = st.text_input("Nome Completo")
+            email = st.text_input("E-mail")
+            senha = st.text_input("Senha", type="password")
+            nivel = st.selectbox("Nível", ["operador", "admin"])
             if st.form_submit_button("Criar Usuário"):
                 if nome and email and senha:
                     if criar_usuario(nome, email, senha, nivel):
-                        st.success(f"✅ Usuário **{email}** criado com sucesso!")
+                        st.success(f"Usuário {email} criado com sucesso!")
                     else:
-                        st.error("❌ E-mail já existe. Tente outro.")
+                        st.error("E-mail já existe!")
                 else:
-                    st.error("❌ Preencha todos os campos obrigatórios.")
+                    st.error("Preencha todos os campos!")
+
+    elif opcao == "Histórico de Cadastro de Funcionários" and st.session_state.nivel == "admin":
+        st.header("Histórico de Cadastro de Funcionários")
+        df = listar_usuarios()
+        if not df.empty:
+            st.write("### Lista completa de usuários cadastrados:")
+            st.dataframe(df, use_container_width=True)
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="Baixar Lista (CSV)",
+                data=csv,
+                file_name="historico_funcionarios.csv",
+                mime="text/csv"
+            )
+        else:
+            st.info("Nenhum funcionário cadastrado ainda.")
 
 st.markdown("---")
-st.markdown("*Sistema FSJ Logística por Grok (xAI) - 2025*")
+st.markdown("*FSJ Logística - Sistema por Grok*")
