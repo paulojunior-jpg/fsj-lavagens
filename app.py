@@ -1,4 +1,4 @@
-# app.py - FSJ com CADASTRO + HISTÓRICO DE FUNCIONÁRIOS
+# app.py - FSJ com HISTÓRICO + ALTERAR SENHA + NÍVEL
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -61,9 +61,23 @@ def validar_login(email, senha):
 
 def listar_usuarios():
     conn = sqlite3.connect('fsj_lavagens.db')
-    df = pd.read_sql_query('SELECT nome, email, senha, nivel, data_cadastro FROM usuarios ORDER BY data_cadastro DESC', conn)
+    df = pd.read_sql_query('SELECT id, nome, email, senha, nivel, data_cadastro FROM usuarios ORDER BY data_cadastro DESC', conn)
     conn.close()
     return df
+
+def alterar_senha(email, nova_senha):
+    conn = sqlite3.connect('fsj_lavagens.db')
+    c = conn.cursor()
+    c.execute('UPDATE usuarios SET senha = ? WHERE email = ?', (nova_senha, email))
+    conn.commit()
+    conn.close()
+
+def alterar_nivel(email, novo_nivel):
+    conn = sqlite3.connect('fsj_lavagens.db')
+    c = conn.cursor()
+    c.execute('UPDATE usuarios SET nivel = ? WHERE email = ?', (novo_nivel, email))
+    conn.commit()
+    conn.close()
 
 def emitir_ordem(placa, motorista, operacao, hora_inicio, hora_fim, obs, usuario):
     conn = sqlite3.connect('fsj_lavagens.db')
@@ -119,7 +133,6 @@ else:
     st.sidebar.success(f"Logado como: {st.session_state.usuario}")
     st.sidebar.button("Sair", on_click=lambda: (setattr(st.session_state, 'logado', False), st.rerun()))
 
-    # MENU
     opcoes = ["Emitir Nova Ordem", "Ver Histórico"]
     if st.session_state.nivel == "admin":
         opcoes.extend(["Cadastrar Novo Usuário", "Histórico de Cadastro de Funcionários"])
@@ -184,14 +197,40 @@ else:
         st.header("Histórico de Cadastro de Funcionários")
         df = listar_usuarios()
         if not df.empty:
-            st.write("### Lista completa de usuários cadastrados:")
-            st.dataframe(df, use_container_width=True)
-            csv = df.to_csv(index=False).encode('utf-8')
+            for _, row in df.iterrows():
+                col1, col2, col3, col4, col5, col6 = st.columns([2, 2, 1.5, 2, 1.5, 1.5])
+                col1.write(f"**{row['nome']}**")
+                col2.write(f"`{row['email']}`")
+                col3.write(f"**{row['nivel'].title()}**")
+                col4.write(f"{row['data_cadastro']}")
+                
+                # BOTÃO ALTERAR SENHA
+                if st.button("Senha", key=f"senha_{row['id']}"):
+                    with st.form(f"form_senha_{row['id']}"):
+                        nova_senha = st.text_input("Nova Senha", type="password", key=f"ns_{row['id']}")
+                        if st.form_submit_button("Salvar Senha"):
+                            if nova_senha:
+                                alterar_senha(row['email'], nova_senha)
+                                st.success(f"Senha de **{row['email']}** atualizada!")
+                                st.rerun()
+                            else:
+                                st.error("Digite uma senha!")
+                
+                # BOTÃO ALTERAR NÍVEL
+                if st.button("Nível", key=f"nivel_{row['id']}"):
+                    with st.form(f"form_nivel_{row['id']}"):
+                        novo_nivel = st.selectbox("Novo Nível", ["operador", "admin"], key=f"nn_{row['id']}")
+                        if st.form_submit_button("Salvar Nível"):
+                            alterar_nivel(row['email'], novo_nivel)
+                            st.success(f"Nível de **{row['email']}** alterado para **{novo_nivel}**!")
+                            st.rerun()
+
+            st.markdown("---")
             st.download_button(
-                label="Baixar Lista (CSV)",
-                data=csv,
-                file_name="historico_funcionarios.csv",
-                mime="text/csv"
+                "Baixar Lista (CSV)",
+                df[['nome', 'email', 'senha', 'nivel', 'data_cadastro']].to_csv(index=False).encode('utf-8'),
+                "historico_funcionarios.csv",
+                "text/csv"
             )
         else:
             st.info("Nenhum funcionário cadastrado ainda.")
