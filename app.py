@@ -1,4 +1,4 @@
-# app.py - MENU LATERAL: TÍTULOS ESTÁTICOS + SUBITENS CLICÁVEIS + ANIMAÇÃO
+# app.py - MENU LATERAL PERFEITO + ERRO DE SINTAXE CORRIGIDO
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -15,7 +15,7 @@ st.markdown("""
     .menu-title {
         font-weight: bold;
         font-size: 16px;
-        padding: ...
+        padding: 10px 0;
         margin: 15px 0 8px 0;
         color: #1565c0;
         display: flex;
@@ -81,8 +81,9 @@ def init_db():
         observacoes TEXT,
         usuario_criacao TEXT
     )''')
+    # CORRIGIDO: datetime.now() com parênteses e vírgula
     c.execute('INSERT OR IGNORE INTO usuarios (nome, email, senha, nivel, data_cadastro) VALUES (?, ?, ?, ?, ?)',
-              ('Admin FSJ', 'admin@fsj.com', 'fsj123', 'admin', datetime	now().strftime('%d/%m/%Y %H:%M')))
+              ('Admin FSJ', 'admin@fsj.com', 'fsj123', 'admin', datetime.now().strftime('%d/%m/%Y %H:%M')))
     conn.commit()
     conn.close()
 
@@ -149,7 +150,7 @@ if 'pagina' not in st.session_state:
     st.session_state.pagina = "login"
 if 'lavagem_expandido' not in st.session_state:
     st.session_state.lavagem_expandido = True
-if 'usuarios_expandido' not inioans not in st.session_state:
+if 'usuarios_expandido' not in st.session_state:
     st.session_state.usuarios_expandido = True
 
 # Login
@@ -178,10 +179,10 @@ else:
         st.button("Sair", on_click=sair, use_container_width=True)
         st.markdown("---")
 
-        # TÍTULO: Lavagem (com ícone)
+        # TÍTULO: Lavagem (com ícone de caminhão com ducha)
         st.markdown("""
         <div class="menu-title">
-            Caminhão Lavando Lavagem
+            Lavagem
         </div>
         """, unsafe_allow_html=True)
 
@@ -189,14 +190,12 @@ else:
         submenu_lav = "submenu expanded" if st.session_state.lavagem_expandido else "submenu collapsed"
         st.markdown(f'<div class="{submenu_lav}">', unsafe_allow_html=True)
 
-        col1 = st.columns(1)[0]
-        with col1:
-            if st.button("Emitir Ordem de Lavagem", key="btn_emitir", use_container_width=True):
-                st.session_state.pagina = "emitir_ordem"
-                st.rerun()
-            if st.button("Pesquisa de Lavagens", key="btn_pesquisa_lav", use_container_width=True):
-                st.session_state.pagina = "pesquisa_lavagens"
-                st.rerun()
+        if st.button("Emitir Ordem de Lavagem", key="btn_emitir", use_container_width=True):
+            st.session_state.pagina = "emitir_ordem"
+            st.rerun()
+        if st.button("Pesquisa de Lavagens", key="btn_pesquisa_lav", use_container_width=True):
+            st.session_state.pagina = "pesquisa_lavagens"
+            st.rerun()
 
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -204,21 +203,19 @@ else:
         if st.session_state.nivel == "admin":
             st.markdown("""
             <div class="menu-title">
-                Usuários Usuários
+                Usuários
             </div>
             """, unsafe_allow_html=True)
 
             submenu_usr = "submenu expanded" if st.session_state.usuarios_expandido else "submenu collapsed"
             st.markdown(f'<div class="{submenu_usr}">', unsafe_allow_html=True)
 
-            col2 = st.columns(1)[0]
-            with col2:
-                if st.button("Cadastro", key="btn_cadastro", use_container_width=True):
-                    st.session_state.pagina = "cadastro_usuario"
-                    st.rerun()
-                if st.button("Pesquisa", key="btn_pesquisa_usr", use_container_width=True):
-                    st.session_state.pagina = "pesquisa_usuarios"
-                    st.rerun()
+            if st.button("Cadastro", key="btn_cadastro", use_container_width=True):
+                st.session_state.pagina = "cadastro_usuario"
+                st.rerun()
+            if st.button("Pesquisa", key="btn_pesquisa_usr", use_container_width=True):
+                st.session_state.pagina = "pesquisa_usuarios"
+                st.rerun()
 
             st.markdown('</div>', unsafe_allow_html=True)
 
