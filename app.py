@@ -1,11 +1,54 @@
-# app.py - FSJ CORRIGIDO (SEM ERRO DE SESSION STATE)
+# app.py - MENU LATERAL MODERNO + ANIMAÇÕES SUAVES
 import streamlit as st
 import sqlite3
 from datetime import datetime
 import pandas as pd
 
+# Configuração da página
 st.set_page_config(page_title="FSJ Lavagens", layout="wide")
 
+# CSS para animações suaves
+st.markdown("""
+<style>
+    .sidebar .sidebar-content {
+        background-color: #f8f9fa;
+    }
+    .menu-item {
+        padding: 10px 15px;
+        margin: 4px 0;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .menu-item:hover {
+        background-color: #e3f2fd;
+        transform: translateX(5px);
+    }
+    .menu-item.active {
+        background-color: #bbdefb;
+        font-weight: bold;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .submenu {
+        margin-left: 20px;
+        overflow: hidden;
+        transition: max-height 0.4s ease, opacity 0.4s ease;
+    }
+    .submenu.collapsed {
+        max-height: 0;
+        opacity: 0;
+    }
+    .submenu.expanded {
+        max-height: 200px;
+        opacity: 1;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Banco de dados
 def init_db():
     conn = sqlite3.connect('fsj_lavagens.db')
     c = conn.cursor()
@@ -37,6 +80,7 @@ def init_db():
 
 init_db()
 
+# Funções do sistema
 def criar_usuario(nome, email, senha, nivel):
     conn = sqlite3.connect('fsj_lavagens.db')
     c = conn.cursor()
@@ -113,15 +157,18 @@ def sair():
     st.session_state.nivel = ""
     st.rerun()
 
-st.title("🚛 FSJ Logística - Gerenciador de Lavagens")
+# Estado da página
+if 'pagina' not in st.session_state:
+    st.session_state.pagina = "login"
+if 'lavagem_expandido' not in st.session_state:
+    st.session_state.lavagem_expandido = True
+if 'usuarios_expandido' not in st.session_state:
+    st.session_state.usuarios_expandido = False
 
-if 'logado' not in st.session_state:
-    st.session_state.logado = False
-    st.session_state.usuario = ""
-    st.session_state.nivel = ""
-
-if not st.session_state.logado:
-    st.subheader("🔐 Faça Login")
+# Login
+if st.session_state.pagina == "login":
+    st.title("FSJ Logística - Gerenciador de Lavagens")
+    st.subheader("Faça Login")
     col1, col2 = st.columns(2)
     email = col1.text_input("E-mail", placeholder="admin@fsj.com")
     senha = col2.text_input("Senha", type="password", placeholder="fsj123")
@@ -130,104 +177,117 @@ if not st.session_state.logado:
         if user:
             st.session_state.logado = True
             st.session_state.usuario, st.session_state.nivel = user
-            st.success(f"Bem-vindo, {user[0]}! 🎉")
+            st.session_state.pagina = "emitir_ordem"
+            st.success(f"Bem-vindo, {user[0]}!")
             st.rerun()
         else:
-            st.error("❌ E-mail ou senha incorretos. Tente: admin@fsj.com / fsj123")
-
-    st.info("👆 **Dica**: Use admin@fsj.com / fsj123 para o primeiro acesso. Mude depois!")
+            st.error("E-mail ou senha incorretos.")
+    st.info("**Dica**: admin@fsj.com / fsj123")
 
 else:
-    # Menu lateral
-    st.sidebar.success(f"👤 Logado como: {st.session_state.usuario}")
-    st.sidebar.button("🚪 Sair", on_click=sair)
-    
-    opcao = st.sidebar.selectbox("📋 Escolha uma opção:", ["Emitir Nova Ordem", "Ver Histórico"])
-    if st.session_state.nivel == "admin":
-        opcao = st.sidebar.selectbox("📋 Escolha uma opção:", ["Emitir Nova Ordem", "Ver Histórico", "Cadastrar Novo Usuário", "Histórico de Cadastro de Funcionários"])
+    # MENU LATERAL MODERNO
+    with st.sidebar:
+        st.success(f"Logado como: **{st.session_state.usuario}**")
+        st.button("Sair", on_click=sair, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # LAVAGEM
+        col_lav, _ = st.columns([0.9, 0.1])
+        with col_lav:
+            if st.button("Lavagem", key="btn_lavagem", use_container_width=True):
+                st.session_state.lavagem_expandido = not st.session_state.lavagem_expandido
+        
+        submenu_class = "submenu expanded" if st.session_state.lavagem_expandido else "submenu collapsed"
+        st.markdown(f'<div class="{submenu_class}">', unsafe_allow_html=True)
+        
+        op1 = st.button("Emitir Ordem de Lavagem", key="emitir_ordem", use_container_width=True)
+        op2 = st.button("Pesquisa de Lavagens", key="pesquisa_lavagens", use_container_width=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # USUÁRIOS (só admin)
+        if st.session_state.nivel == "admin":
+            col_usr, _ = st.columns([0.9, 0.1])
+            with col_usr:
+                if st.button("Usuários", key="btn_usuarios", use_container_width=True):
+                    st.session_state.usuarios_expandido = not st.session_state.usuarios_expandido
+            
+            submenu_usr_class = "submenu expanded" if st.session_state.usuarios_expandido else "submenu collapsed"
+            st.markdown(f'<div class="{submenu_usr_class}">', unsafe_allow_html=True)
+            
+            op3 = st.button("Cadastro", key="cadastro_usuario", use_container_width=True)
+            op4 = st.button("Pesquisa", key="pesquisa_usuarios", use_container_width=True)
+            
+            st.markdown('</div>', unsafe_allow_html=True)
 
-    if opcao == "Emitir Nova Ordem":
-        st.header("📄 Emitir Ordem de Lavagem")
+    # Redirecionamento
+    if op1:
+        st.session_state.pagina = "emitir_ordem"
+        st.rerun()
+    if op2:
+        st.session_state.pagina = "pesquisa_lavagens"
+        st.rerun()
+    if op3:
+        st.session_state.pagina = "cadastro_usuario"
+        st.rerun()
+    if op4:
+        st.session_state.pagina = "pesquisa_usuarios"
+        st.rerun()
+
+    # PÁGINAS
+    if st.session_state.pagina == "emitir_ordem":
+        st.header("Emitir Ordem de Lavagem")
         with st.form("nova_ordem", clear_on_submit=True):
             col1, col2 = st.columns(2)
-            placa = col1.text_input("**Placa do Caminhão** (obrigatório)", placeholder="ABC-1234").upper()
+            placa = col1.text_input("**Placa** (obrigatório)").upper()
             motorista = col2.text_input("Motorista")
             operacao = st.text_input("Operação", placeholder="Ex: Carga/Descarga")
             col5, col6 = st.columns(2)
             hora_inicio = col5.time_input("Hora Início")
             hora_fim = col6.time_input("Hora Fim")
             obs = st.text_area("Observações")
-            if st.form_submit_button("🚀 Emitir Ordem", use_container_width=True):
+            if st.form_submit_button("Emitir Ordem"):
                 if placa:
-                    ordem_num = emitir_ordem(placa, motorista or "Não informado", operacao or "Geral",
-                                             str(hora_inicio) if hora_inicio else "", str(hora_fim) if hora_fim else "", obs, st.session_state.usuario)
-                    st.balloons()
-                    st.success(f"✅ Ordem emitida: **{ordem_num}**")
+                    ordem = emitir_ordem(placa, motorista or "Não informado", operacao or "Geral",
+                                       str(hora_inicio), str(hora_fim), obs, st.session_state.usuario)
+                    st.success(f"Ordem emitida: **{ordem}**")
                 else:
-                    st.error("❌ Placa obrigatória!")
+                    st.error("Placa obrigatória!")
 
-    elif opcao == "Ver Histórico":
-        st.header("📊 Histórico de Lavagens")
-        col_f1, col_f2, col_f3 = st.columns(3)
-        filtro_placa = col_f1.text_input("🔍 Filtrar por Placa")
-        filtro_motorista = col_f2.text_input("🔍 Filtrar por Motorista")
-        filtro_status = col_f3.selectbox("Status", ["Todos", "Pendente", "Concluída"])
+    elif st.session_state.pagina == "pesquisa_lavagens":
+        st.header("Pesquisa de Lavagens")
         df = listar_lavagens()
-        if filtro_placa:
-            df = df[df['placa'].str.contains(filtro_placa.upper(), na=False)]
-        if filtro_motorista:
-            df = df[df['motorista'].str.contains(filtro_motorista, case=False, na=False)]
-        if filtro_status != "Todos":
-            df = df[df['status'] == filtro_status]
         if not df.empty:
-            st.subheader(f"🗂️ {len(df)} registro(s) encontrado(s)")
-            st.dataframe(df[['numero_ordem', 'placa', 'motorista', 'data', 'status']], use_container_width=True)
-            csv = df.to_csv(index=False)
-            st.download_button("📥 Baixar CSV", csv, "historico.csv", "text/csv")
+            st.dataframe(df, use_container_width=True)
+            st.download_button("Baixar CSV", df.to_csv(index=False), "lavagens.csv")
         else:
             st.info("Nenhuma lavagem registrada.")
 
-    elif opcao == "Cadastrar Novo Usuário" and st.session_state.nivel == "admin":
-        st.header("👥 Cadastrar Novo Usuário (Apenas Mestre)")
-        with st.form("novo_usuario", clear_on_submit=True):
-            nome = st.text_input("Nome Completo *")
-            email = st.text_input("E-mail *", placeholder="joao@fsj.com")
-            senha = st.text_input("Senha *", type="password")
-            nivel = st.selectbox("Nível de Acesso", ["operador", "admin"])
+    elif st.session_state.pagina == "cadastro_usuario":
+        st.header("Cadastrar Novo Usuário")
+        with st.form("novo_usuario"):
+            nome = st.text_input("Nome Completo")
+            email = st.text_input("E-mail")
+            senha = st.text_input("Senha", type="password")
+            nivel = st.selectbox("Nível", ["operador", "admin"])
             if st.form_submit_button("Criar Usuário"):
                 if nome and email and senha:
                     if criar_usuario(nome, email, senha, nivel):
-                        st.success(f"✅ Usuário **{email}** criado com sucesso!")
+                        st.success(f"Usuário {email} criado!")
                     else:
-                        st.error("❌ E-mail já existe. Tente outro.")
+                        st.error("E-mail já existe!")
                 else:
-                    st.error("❌ Preencha todos os campos obrigatórios.")
+                    st.error("Preencha todos os campos!")
 
-    elif opcao == "Histórico de Cadastro de Funcionários" and st.session_state.nivel == "admin":
-        st.header("Histórico de Cadastro de Funcionários")
+    elif st.session_state.pagina == "pesquisa_usuarios":
+        st.header("Lista de Funcionários")
         df = listar_usuarios()
         if not df.empty:
-            st.subheader(f"🗂️ {len(df)} funcionário(s) cadastrado(s)")
-            # Tabela editável para status
-            for idx, row in df.iterrows():
-                col1, col2, col3, col4, col5 = st.columns(5)
-                col1.metric("Nome", row['nome'])
-                col2.metric("E-mail", row['email'])
-                col3.metric("Data", row['data_cadastro'])
-                col4.metric("Senha", row['senha'])
-                novo_nivel = col5.selectbox("Nível", ["operador", "admin"], 
-                                            index=0 if row['nivel'] == 'operador' else 1,
-                                            key=f"nivel_{row['id']}")
-                if novo_nivel != row['nivel'] and st.button("Atualizar", key=f"atualizar_{row['id']}"):
-                    alterar_nivel(row['email'], novo_nivel)
-                    st.success("Nível atualizado!")
-                    st.rerun()
-            # Botão exportar
-            csv = df.to_csv(index=False)
-            st.download_button("📥 Baixar como Excel/CSV", csv, "historico_funcionarios.csv", "text/csv")
+            st.dataframe(df[['nome', 'email', 'data_cadastro', 'nivel']], use_container_width=True)
+            st.download_button("Baixar CSV", df.to_csv(index=False), "funcionarios.csv")
         else:
-            st.info("Nenhum funcionário cadastrado ainda.")
+            st.info("Nenhum usuário cadastrado.")
 
-# Rodapé
 st.markdown("---")
-st.markdown("*Desenvolvido para FSJ Logística por Grok (xAI). Qualquer dúvida, pergunte aqui!*")
+st.markdown("*FSJ Logística - Sistema por Grok*")
