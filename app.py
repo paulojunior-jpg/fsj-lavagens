@@ -1,48 +1,56 @@
-# app.py - MENU LATERAL MODERNO + ANIMAÇÕES SUAVES
+# app.py - MENU LATERAL: TÍTULOS ESTÁTICOS + SUBITENS CLICÁVEIS + ANIMAÇÃO
 import streamlit as st
 import sqlite3
 from datetime import datetime
 import pandas as pd
 
-# Configuração da página
 st.set_page_config(page_title="FSJ Lavagens", layout="wide")
 
-# CSS para animações suaves
+# CSS para animações suaves e estilo
 st.markdown("""
 <style>
     .sidebar .sidebar-content {
         background-color: #f8f9fa;
     }
+    .menu-title {
+        font-weight: bold;
+        font-size: 16px;
+        padding: ...
+        margin: 15px 0 8px 0;
+        color: #1565c0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
     .menu-item {
         padding: 10px 15px;
-        margin: 4px 0;
+        margin: 3px 0;
         border-radius: 8px;
         cursor: pointer;
         transition: all 0.3s ease;
+        font-size: 14px;
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
     }
     .menu-item:hover {
         background-color: #e3f2fd;
-        transform: translateX(5px);
+        transform: translateX(4px);
     }
-    .menu-item.active {
+    .menu-item:active {
         background-color: #bbdefb;
-        font-weight: bold;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
     .submenu {
-        margin-left: 20px;
         overflow: hidden;
         transition: max-height 0.4s ease, opacity 0.4s ease;
+        margin-left: 10px;
     }
     .submenu.collapsed {
         max-height: 0;
         opacity: 0;
     }
     .submenu.expanded {
-        max-height: 200px;
+        max-height: 300px;
         opacity: 1;
     }
 </style>
@@ -74,7 +82,7 @@ def init_db():
         usuario_criacao TEXT
     )''')
     c.execute('INSERT OR IGNORE INTO usuarios (nome, email, senha, nivel, data_cadastro) VALUES (?, ?, ?, ?, ?)',
-              ('Admin FSJ', 'admin@fsj.com', 'fsj123', 'admin', datetime.now().strftime('%d/%m/%Y %H:%M')))
+              ('Admin FSJ', 'admin@fsj.com', 'fsj123', 'admin', datetime	now().strftime('%d/%m/%Y %H:%M')))
     conn.commit()
     conn.close()
 
@@ -109,20 +117,6 @@ def listar_usuarios():
     conn.close()
     return df
 
-def alterar_senha(email, nova_senha):
-    conn = sqlite3.connect('fsj_lavagens.db')
-    c = conn.cursor()
-    c.execute('UPDATE usuarios SET senha = ? WHERE email = ?', (nova_senha, email))
-    conn.commit()
-    conn.close()
-
-def alterar_nivel(email, novo_nivel):
-    conn = sqlite3.connect('fsj_lavagens.db')
-    c = conn.cursor()
-    c.execute('UPDATE usuarios SET nivel = ? WHERE email = ?', (novo_nivel, email))
-    conn.commit()
-    conn.close()
-
 def emitir_ordem(placa, motorista, operacao, hora_inicio, hora_fim, obs, usuario):
     conn = sqlite3.connect('fsj_lavagens.db')
     c = conn.cursor()
@@ -144,13 +138,6 @@ def listar_lavagens():
     conn.close()
     return df
 
-def atualizar_status(ordem, status):
-    conn = sqlite3.connect('fsj_lavagens.db')
-    c = conn.cursor()
-    c.execute('UPDATE lavagens SET status = ? WHERE numero_ordem = ?', (status, ordem))
-    conn.commit()
-    conn.close()
-
 def sair():
     st.session_state.logado = False
     st.session_state.usuario = ""
@@ -162,8 +149,8 @@ if 'pagina' not in st.session_state:
     st.session_state.pagina = "login"
 if 'lavagem_expandido' not in st.session_state:
     st.session_state.lavagem_expandido = True
-if 'usuarios_expandido' not in st.session_state:
-    st.session_state.usuarios_expandido = False
+if 'usuarios_expandido' not inioans not in st.session_state:
+    st.session_state.usuarios_expandido = True
 
 # Login
 if st.session_state.pagina == "login":
@@ -185,55 +172,55 @@ if st.session_state.pagina == "login":
     st.info("**Dica**: admin@fsj.com / fsj123")
 
 else:
-    # MENU LATERAL MODERNO
+    # MENU LATERAL
     with st.sidebar:
         st.success(f"Logado como: **{st.session_state.usuario}**")
         st.button("Sair", on_click=sair, use_container_width=True)
-        
         st.markdown("---")
-        
-        # LAVAGEM
-        col_lav, _ = st.columns([0.9, 0.1])
-        with col_lav:
-            if st.button("Lavagem", key="btn_lavagem", use_container_width=True):
-                st.session_state.lavagem_expandido = not st.session_state.lavagem_expandido
-        
-        submenu_class = "submenu expanded" if st.session_state.lavagem_expandido else "submenu collapsed"
-        st.markdown(f'<div class="{submenu_class}">', unsafe_allow_html=True)
-        
-        op1 = st.button("Emitir Ordem de Lavagem", key="emitir_ordem", use_container_width=True)
-        op2 = st.button("Pesquisa de Lavagens", key="pesquisa_lavagens", use_container_width=True)
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # USUÁRIOS (só admin)
-        if st.session_state.nivel == "admin":
-            col_usr, _ = st.columns([0.9, 0.1])
-            with col_usr:
-                if st.button("Usuários", key="btn_usuarios", use_container_width=True):
-                    st.session_state.usuarios_expandido = not st.session_state.usuarios_expandido
-            
-            submenu_usr_class = "submenu expanded" if st.session_state.usuarios_expandido else "submenu collapsed"
-            st.markdown(f'<div class="{submenu_usr_class}">', unsafe_allow_html=True)
-            
-            op3 = st.button("Cadastro", key="cadastro_usuario", use_container_width=True)
-            op4 = st.button("Pesquisa", key="pesquisa_usuarios", use_container_width=True)
-            
-            st.markdown('</div>', unsafe_allow_html=True)
 
-    # Redirecionamento
-    if op1:
-        st.session_state.pagina = "emitir_ordem"
-        st.rerun()
-    if op2:
-        st.session_state.pagina = "pesquisa_lavagens"
-        st.rerun()
-    if op3:
-        st.session_state.pagina = "cadastro_usuario"
-        st.rerun()
-    if op4:
-        st.session_state.pagina = "pesquisa_usuarios"
-        st.rerun()
+        # TÍTULO: Lavagem (com ícone)
+        st.markdown("""
+        <div class="menu-title">
+            Caminhão Lavando Lavagem
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Submenu Lavagem
+        submenu_lav = "submenu expanded" if st.session_state.lavagem_expandido else "submenu collapsed"
+        st.markdown(f'<div class="{submenu_lav}">', unsafe_allow_html=True)
+
+        col1 = st.columns(1)[0]
+        with col1:
+            if st.button("Emitir Ordem de Lavagem", key="btn_emitir", use_container_width=True):
+                st.session_state.pagina = "emitir_ordem"
+                st.rerun()
+            if st.button("Pesquisa de Lavagens", key="btn_pesquisa_lav", use_container_width=True):
+                st.session_state.pagina = "pesquisa_lavagens"
+                st.rerun()
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # TÍTULO: Usuários (só admin)
+        if st.session_state.nivel == "admin":
+            st.markdown("""
+            <div class="menu-title">
+                Usuários Usuários
+            </div>
+            """, unsafe_allow_html=True)
+
+            submenu_usr = "submenu expanded" if st.session_state.usuarios_expandido else "submenu collapsed"
+            st.markdown(f'<div class="{submenu_usr}">', unsafe_allow_html=True)
+
+            col2 = st.columns(1)[0]
+            with col2:
+                if st.button("Cadastro", key="btn_cadastro", use_container_width=True):
+                    st.session_state.pagina = "cadastro_usuario"
+                    st.rerun()
+                if st.button("Pesquisa", key="btn_pesquisa_usr", use_container_width=True):
+                    st.session_state.pagina = "pesquisa_usuarios"
+                    st.rerun()
+
+            st.markdown('</div>', unsafe_allow_html=True)
 
     # PÁGINAS
     if st.session_state.pagina == "emitir_ordem":
