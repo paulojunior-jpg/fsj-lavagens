@@ -1,4 +1,4 @@
-# app.py - MENU 3 PONTINHOS COM BOTÕES ALINHADOS E RESPONSIVOS
+# app.py - MENU 3 PONTINHOS 100% ALINHADO E COMPACTO
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -6,7 +6,7 @@ import pandas as pd
 
 st.set_page_config(page_title="FSJ Lavagens", layout="wide")
 
-# CSS MELHORADO: BOTÕES 100% + ALINHAMENTO PERFEITO
+# CSS OTIMIZADO: MENU COMPACTO E ALINHADO
 st.markdown("""
 <style>
     .sidebar .sidebar-content {
@@ -18,9 +18,6 @@ st.markdown("""
         padding: 10px 0;
         margin: 15px 0 8px 0;
         color: #1565c0;
-        display: flex;
-        align-items: center;
-        gap: 8px;
     }
     .submenu {
         overflow: hidden;
@@ -35,20 +32,27 @@ st.markdown("""
         max-height: 300px;
         opacity: 1;
     }
-    /* MENU DE 3 PONTINHOS */
+    /* MENU 3 PONTINHOS - COMPACTO E ALINHADO */
+    div[data-testid="column"]:last-child {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
     .action-expander {
+        width: 40px !important;
         margin: 0 !important;
         padding: 0 !important;
     }
-    .action-expander > div > div {
-        padding: 4px 0 !important;
+    .action-expander > div {
+        padding: 0 !important;
     }
     .action-button {
         width: 100% !important;
-        text-align: left !important;
-        padding: 6px 10px !important;
-        margin: 2px 0 !important;
-        font-size: 13px !important;
+        text-align: center !important;
+        padding: 8px 4px !important;
+        margin: 1px 0 !important;
+        font-size: 12px !important;
+        border-radius: 6px !important;
     }
     .action-button:hover {
         background-color: #e3f2fd !important;
@@ -270,21 +274,23 @@ else:
                 
                 with cols[4]:
                     with st.expander("⋮", expanded=False):
-                        st.markdown("<style>.action-button {width:100%}</style>", unsafe_allow_html=True)
-                        if st.button("Alterar", key=f"edit_{row['id']}", use_container_width=True):
-                            st.session_state.editando = row['id']
-                            st.rerun()
-                        if st.button("Excluir", key=f"del_{row['id']}", type="secondary", use_container_width=True):
-                            if st.session_state.get('confirmar_exclusao') == row['id']:
-                                excluir_usuario(row['id'])
-                                st.success("Usuário excluído!")
-                                if 'confirmar_exclusao' in st.session_state:
-                                    del st.session_state.confirmar_exclusao
+                        col_btn1, col_btn2 = st.columns(2)
+                        with col_btn1:
+                            if st.button("Alterar", key=f"edit_{row['id']}", use_container_width=True):
+                                st.session_state.editando = row['id']
                                 st.rerun()
-                            else:
-                                st.session_state.confirmar_exclusao = row['id']
-                                st.warning("Clique novamente para confirmar.")
-                                st.rerun()
+                        with col_btn2:
+                            if st.button("Excluir", key=f"del_{row['id']}", type="secondary", use_container_width=True):
+                                if st.session_state.get('confirmar_exclusao') == row['id']:
+                                    excluir_usuario(row['id'])
+                                    st.success("Usuário excluído!")
+                                    if 'confirmar_exclusao' in st.session_state:
+                                        del st.session_state.confirmar_exclusao
+                                    st.rerun()
+                                else:
+                                    st.session_state.confirmar_exclusao = row['id']
+                                    st.warning("Clique novamente para confirmar.")
+                                    st.rerun()
 
             # Formulário de edição
             if st.session_state.editando is not None:
