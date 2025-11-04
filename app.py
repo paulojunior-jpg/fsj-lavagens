@@ -1,12 +1,13 @@
-# app.py - SISTEMA COMPLETO: LOGIN PARA TODOS + CONTROLE DE ACESSO
+# app.py - SISTEMA COM ÁRVORE VEÍCULOS (CADASTRO + PESQUISA)
 import streamlit as st
 import sqlite3
 from datetime import datetime
 import pandas as pd
+import re  # para validar placa
 
 st.set_page_config(page_title="FSJ Lavagens", layout="wide")
 
-# CSS OTIMIZADO
+# CSS
 st.markdown("""
 <style>
     .sidebar .sidebar-content {
@@ -31,22 +32,6 @@ st.markdown("""
     .submenu.expanded {
         max-height: 300px;
         opacity: 1;
-    }
-    div[data-testid="column"]:last-child {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    }
-    .action-button {
-        width: 100% !important;
-        text-align: center !important;
-        padding: 8px 4px !important;
-        margin: 1px 0 !important;
-        font-size: 12px !important;
-        border-radius: 6px !important;
-    }
-    .action-button:hover {
-        background-color: #e3f2fd !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -76,6 +61,14 @@ def init_db():
         observacoes TEXT,
         usuario_criacao TEXT
     )''')
+    # NOVA TABELA: VEÍCULOS
+    c.execute('''CREATE TABLE IF NOT EXISTS veiculos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        placa TEXT UNIQUE NOT NULL,
+        tipo TEXT NOT NULL,
+        modelo_marca TEXT,
+        data_cadastro TEXT
+    )''')
     # Usuário admin padrão
     c.execute('INSERT OR IGNORE INTO usuarios (nome, email, senha, nivel, data_cadastro) VALUES (?, ?, ?, ?, ?)',
               ('Admin FSJ', 'admin@fsj.com', 'fsj123', 'admin', datetime.now().strftime('%d/%m/%Y %H:%M')))
@@ -84,7 +77,28 @@ def init_db():
 
 init_db()
 
-# FUNÇÕES
+# FUNÇÕES VEÍCULOS
+def cadastrar_veiculo(placa, tipo, modelo_marca):
+    conn = sqlite3.connect('fsj_lavagens.db')
+    c = conn.cursor()
+    data_cad = datetime.now().strftime('%d/%m/%Y %H:%M')
+    try:
+        c.execute('INSERT INTO veiculos (placa, tipo, modelo_marca, data_cadastro) VALUES (?, ?, ?, ?)',
+                  (placa.upper(), tipo, modelo_marca, data_cad))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False  # Placa já existe
+    finally:
+        conn.close()
+
+def listar_veiculos():
+    conn = sqlite3.connect('fsj_lavagens.db')
+    df = pd.read_sql_query('SELECT placa, tipo, modelo_marca, data_cadastro FROM veiculos ORDER BY data_cadastro DESC', conn)
+    conn.close()
+    return df
+
+# FUNÇÕES USUÁRIOS
 def criar_usuario(nome, email, senha, nivel):
     conn = sqlite3.connect('fsj_lavagens.db')
     c = conn.cursor()
@@ -94,7 +108,7 @@ def criar_usuario(nome, email, senha, nivel):
                   (nome, email, senha, nivel, data_cad))
         conn.commit()
         return True
-    except sqlite3.IntegrityError:
+    except:
         return False
     finally:
         conn.close()
@@ -107,19 +121,7 @@ def validar_login(email, senha):
     conn.close()
     return resultado
 
-def listar_usuarios():
-    conn = sqlite3.connect('fsj_lavagens.db')
-    df = pd.read_sql_query('SELECT id, nome, email, senha, nivel, data_cadastro FROM usuarios ORDER BY data_cadastro DESC', conn)
-    conn.close()
-    return df
-
-def excluir_usuario(user_id):
-    conn = sqlite3.connect('fsj_lavagens.db')
-    c = conn.cursor()
-    c.execute('DELETE FROM usuarios WHERE id = ?', (user_id,))
-    conn.commit()
-    conn.close()
-
+# FUNÇÕES LAVAGENS
 def emitir_ordem(placa, motorista, operacao, hora_inicio, hora_fim, obs, usuario):
     conn = sqlite3.connect('fsj_lavagens.db')
     c = conn.cursor()
@@ -154,10 +156,8 @@ if 'lavagem_expandido' not in st.session_state:
     st.session_state.lavagem_expandido = True
 if 'usuarios_expandido' not in st.session_state:
     st.session_state.usuarios_expandido = True
-if 'editando' not in st.session_state:
-    st.session_state.editando = None
-if 'confirmar_exclusao' not in st.session_state:
-    st.session_state.confirmar_exclusao = None
+if 'veiculos_expandido' not in st.session_state:
+    st.session_state.veiculos_expandido = True
 
 # LOGIN
 if st.session_state.pagina == "login":
@@ -197,16 +197,28 @@ else:
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # USUÁRIOS (SÓ ADMIN)
+        # USUÁRIOS (só admin)
         if st.session_state.nivel == "admin":
             st.markdown('<div class="menu-title">Usuários</div>', unsafe_allow_html=True)
             submenu_usr = "submenu expanded" if st.session_state.usuarios_expandido else "submenu collapsed"
             st.markdown(f'<div class="{submenu_usr}">', unsafe_allow_html=True)
-            if st.button("Cadastro", key="btn_cadastro", use_container_width=True):
+            if st.button("Cadastro", key="btn_cadastro_usr", use_container_width=True):
                 st.session_state.pagina = "cadastro_usuario"
                 st.rerun()
             if st.button("Pesquisa", key="btn_pesquisa_usr", use_container_width=True):
                 st.session_state.pagina = "pesquisa_usuarios"
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            # VEÍCULOS (só admin)
+            st.markdown('<div class="menu-title">Veículos</div>', unsafe_allow_html=True)
+            submenu_veic = "submenu expanded" if st.session_state.veiculos_expandido else "submenu collapsed"
+            st.markdown(f'<div class="{submenu_veic}">', unsafe_allow_html=True)
+            if st.button("Cadastro", key="btn_cadastro_veic", use_container_width=True):
+                st.session_state.pagina = "cadastro_veiculo"
+                st.rerun()
+            if st.button("Pesquisa", key="btn_pesquisa_veic", use_container_width=True):
+                st.session_state.pagina = "pesquisa_veiculos"
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -259,72 +271,40 @@ else:
         st.header("Lista de Funcionários")
         df = listar_usuarios()
         if not df.empty:
-            for _, row in df.iterrows():
-                cols = st.columns([3, 3, 2, 2, 0.5])
-                cols[0].write(row['nome'])
-                cols[1].write(row['email'])
-                cols[2].write(row['data_cadastro'])
-                cols[3].write(row['nivel'].title())
-                
-                with cols[4]:
-                    with st.expander("...", expanded=False):
-                        col_btn1, col_btn2 = st.columns(2)
-                        with col_btn1:
-                            if st.button("Alterar", key=f"edit_{row['id']}", use_container_width=True):
-                                st.session_state.editando = row['id']
-                                st.rerun()
-                        with col_btn2:
-                            if st.button("Excluir", key=f"del_{row['id']}", type="secondary", use_container_width=True):
-                                if st.session_state.get('confirmar_exclusao') == row['id']:
-                                    excluir_usuario(row['id'])
-                                    st.success("Usuário excluído!")
-                                    if 'confirmar_exclusao' in st.session_state:
-                                        del st.session_state.confirmar_exclusao
-                                    st.rerun()
-                                else:
-                                    st.session_state.confirmar_exclusao = row['id']
-                                    st.warning("Clique novamente para confirmar.")
-                                    st.rerun()
-
-            # FORMULÁRIO DE EDIÇÃO
-            if st.session_state.editando is not None:
-                user_df = df[df['id'] == st.session_state.editando]
-                if not user_df.empty:
-                    user = user_df.iloc[0]
-                    st.markdown("---")
-                    st.subheader(f"Editando: {user['nome']}")
-                    with st.form("editar_usuario"):
-                        novo_nome = st.text_input("Nome Completo", value=user['nome'])
-                        novo_email = st.text_input("E-mail", value=user['email'])
-                        nova_senha = st.text_input("Nova Senha (deixe em branco para manter)", type="password")
-                        novo_nivel = st.selectbox("Nível", ["operador", "admin"], 
-                                                index=0 if user['nivel'] == 'operador' else 1)
-                        
-                        col1, col2 = st.columns(2)
-                        if col1.form_submit_button("Salvar"):
-                            conn = sqlite3.connect('fsj_lavagens.db')
-                            c = conn.cursor()
-                            if nova_senha:
-                                c.execute('UPDATE usuarios SET nome=?, email=?, senha=?, nivel=? WHERE id=?',
-                                          (novo_nome, novo_email, nova_senha, novo_nivel, st.session_state.editando))
-                            else:
-                                c.execute('UPDATE usuarios SET nome=?, email=?, nivel=? WHERE id=?',
-                                          (novo_nome, novo_email, novo_nivel, st.session_state.editando))
-                            conn.commit()
-                            conn.close()
-                            st.success("Usuário atualizado!")
-                            del st.session_state.editando
-                            st.rerun()
-                        
-                        if col2.form_submit_button("Cancelar"):
-                            del st.session_state.editando
-                            st.rerun()
-
-            # DOWNLOAD
-            df_display = df[['nome', 'email', 'data_cadastro', 'nivel']].copy()
-            st.download_button("Baixar Lista (CSV)", df_display.to_csv(index=False).encode('utf-8'), "funcionarios.csv", "text/csv")
+            st.dataframe(df[['nome', 'email', 'data_cadastro', 'nivel']], use_container_width=True)
+            st.download_button("Baixar CSV", df.to_csv(index=False), "funcionarios.csv")
         else:
             st.info("Nenhum usuário cadastrado.")
+
+    # CADASTRO DE VEÍCULO
+    elif st.session_state.pagina == "cadastro_veiculo":
+        st.header("Cadastrar Veículo")
+        with st.form("novo_veiculo"):
+            placa = st.text_input("**Placa** (7 caracteres)", maxlength=7, placeholder="ABC1234").upper()
+            tipo = st.selectbox("Tipo", [
+                "Cavalo", "Reboque", "Reboque Bitrem", "Carreta", "Prancha", 
+                "Reboque Refrig.", "Cavalo Bitrem", "VUC", "Truck", "Toco", "Passeio"
+            ])
+            modelo_marca = st.text_input("Modelo/Marca", placeholder="Ex: Volvo FH")
+            
+            if st.form_submit_button("Cadastrar Veículo"):
+                if len(placa) == 7 and re.match("^[A-Z0-9]{7}$", placa):
+                    if cadastrar_veiculo(placa, tipo, modelo_marca):
+                        st.success(f"Veículo **{placa}** cadastrado!")
+                    else:
+                        st.error("Placa já cadastrada!")
+                else:
+                    st.error("Placa deve ter exatamente 7 caracteres (letras e números)!")
+
+    # PESQUISA DE VEÍCULOS
+    elif st.session_state.pagina == "pesquisa_veiculos":
+        st.header("Pesquisa de Veículos")
+        df = listar_veiculos()
+        if not df.empty:
+            st.dataframe(df, use_container_width=True)
+            st.download_button("Baixar CSV", df.to_csv(index=False), "veiculos.csv")
+        else:
+            st.info("Nenhum veículo cadastrado.")
 
 st.markdown("---")
 st.markdown("*FSJ Logística - Sistema por Grok*")
