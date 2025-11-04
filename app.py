@@ -1,10 +1,9 @@
-# app.py - FSJ LAVAGENS: FORNECEDORES + TABELA DE PREÇOS + EDIÇÃO
+# app.py - FSJ LAVAGENS: ORDEM DE LAVAGEM 100% INTEGRADA
 import streamlit as st
 import sqlite3
 from datetime import datetime
 import pandas as pd
 import re
-import io
 
 st.set_page_config(page_title="FSJ Lavagens", layout="wide")
 
@@ -25,7 +24,6 @@ TIPOS_VEICULO = [
     "CAMINHÃO 3/4", "CONJUNTO BITREM", "PRANCHA"
 ]
 
-# SERVIÇOS ATUALIZADOS
 SERVICOS = [
     "LAVAGEM COMPLETA",
     "LAVAGEM + LUBRIFICAÇÃO",
@@ -395,7 +393,7 @@ else:
 
         # LAVAGEM
         st.markdown('<div class="menu-title">Lavagem</div>', unsafe_allow_html=True)
-        submenu_lav = "submenu expanded" if st.session_state.lavagem_expandido else "submenu collapsed"
+        submenu_lav = "submenu expanded" if st.session_state.lavagem_expand_I do = True else "submenu collapsed"
         st.markdown(f'<div class="{submenu_lav}">', unsafe_allow_html=True)
         if st.button("Emitir Ordem de Lavagem", key="btn_emitir", use_container_width=True):
             st.session_state.pagina = "emitir_ordem"
@@ -447,22 +445,97 @@ else:
     # PÁGINAS
     if st.session_state.pagina == "emitir_ordem":
         st.header("Emitir Ordem de Lavagem")
+
+        # Carregar dados
+        df_veiculos = listar_veiculos()
+        df_fornecedores = listar_fornecedores()
+
+        # Listas para selectbox
+        placas = [""] + df_veiculos['placa'].tolist()
+        lavadores = [""] + df_fornecedores['lavador'].tolist()
+
         with st.form("nova_ordem", clear_on_submit=True):
-            col1, col2 = st.columns(2)
-            placa = col1.text_input("**Placa** (obrigatório)").upper()
-            motorista = col2.text_input("Motorista")
-            operacao = st.text_input("Operação", placeholder="Ex: Carga/Descarga")
-            col5, col6 = st.columns(2)
-            hora_inicio = col5.time_input("Hora Início")
-            hora_fim = col6.time_input("Hora Fim")
-            obs = st.text_area("Observações")
-            if st.form_submit_button("Emitir Ordem"):
-                if placa:
-                    ordem = emitir_ordem(placa, motorista or "Não informado", operacao or "Geral",
-                                       str(hora_inicio), str(hora_fim), obs, st.session_state.usuario)
-                    st.success(f"Ordem emitida: **{ordem}**")
+            # DATA AUTOMÁTICA
+            data_ordem = datetime.now().strftime("%d/%m/%Y")
+            st.write(f"**Data:** {data_ordem}")
+
+            # PLACAS
+            col1, col2, col3 = st.columns(3)
+            caminhao = col1.selectbox("**CAMINHÃO**", placas, key="caminhao")
+            reboque1 = col2.selectbox("**REBOQUE 1**", placas, key="reboque1")
+            reboque2 = col3.selectbox("**REBOQUE 2**", placas, key="reboque2")
+
+            # TIPO DE VEÍCULO AUTOMÁTICO
+            tipo_veiculo = ""
+            if caminhao and not reboque1 and not reboque2:
+                tipo_row = df_veiculos[df_veiculos['placa'] == caminhao]
+                tipo_veiculo = tipo_row['tipo'].iloc[0] if not tipo_row.empty else ""
+            elif caminhao and reboque1 and not reboque2:
+                tipo_veiculo = "CONJUNTO LS"
+            elif caminhao and reboque1 and reboque2:
+                tipo_veiculo = "CONJUNTO BITREM"
+
+            st.write(f"**TIPO DE VEÍCULO:** {tipo_veiculo or 'Selecione as placas'}")
+
+            # LAVADOR
+            lavador = st.selectbox("**LAVADOR**", lavadores, key="lavador")
+
+            # SERVIÇO + VALOR (dinâmico)
+            servico = ""
+            valor = 0.0
+            if lavador and tipo_veiculo:
+                forn_id = df_fornecedores[df_fornecedores['lavador'] == lavador].iloc[0]['id']
+                precos_df = listar_precos_por_fornecedor(forn_id)
+                precos_filtrados = precos_df[precos_df['tipo_veiculo'] == tipo_veiculo]
+                servicos_disponiveis = precos_filtrados['servico'].tolist()
+
+                if servicos_disponiveis:
+                    servico = st.selectbox("**SERVIÇO**", servicos_disponiveis, key="servico")
+                    valor_row = precos_filtrados[precos_filtrados['servico'] == servico]
+                    valor = valor_row['valor'].iloc[0] if not valor_row.empty else 0.0
+                    st.write(f"**VALOR:** R$ {valor:.2f}")
                 else:
-                    st.error("Placa obrigatória!")
+                    st.warning("Nenhum serviço cadastrado para este tipo de veículo.")
+            else:
+                st.write("**SERVIÇO:** Selecione Lavador + Placas")
+                st.write("**VALOR:** R$ 0,00")
+
+            # MOTORISTA + FROTA/PX
+            col4, col5 = st.columns(2)
+            motorista = col4.text_input("**MOTORISTA**", max_chars=50)
+            frota = col5.checkbox("FROTA", key="frota")
+            px = col5.checkbox("PX", key="px")
+
+            # OBSERVAÇÕES
+            obs = st.text_area("Observações")
+
+            if st.form_submit_button("Emitir Ordem"):
+                if not caminhao:
+                    st.error("Selecione pelo menos o CAMINHÃO!")
+                elif not lavador:
+                    st.error("Selecione o LAVADOR!")
+                elif not servico:
+                    st.error("Selecione o SERVIÇO!")
+                else:
+                    # Montar placas
+                    placa_final = caminhao
+                    if reboque1:
+                        placa_final += f" + {reboque1}"
+                    if reboque2:
+                        placa_final += f" + {reboque2}"
+
+                    # Emitir ordem
+                    ordem = emitir_ordem(
+                        placa=placa_final,
+                        motorista=motorista or "Não informado",
+                        operacao=f"{tipo_veiculo} - {servico}",
+                        hora_inicio="",
+                        hora_fim="",
+                        obs=f"Lavador: {lavador} | Valor: R${valor:.2f} | Frota: {'Sim' if frota else 'Não'} | PX: {'Sim' if px else 'Não'} | {obs}",
+                        usuario=st.session_state.usuario
+                    )
+                    st.success(f"**Ordem emitida: {ordem}**")
+                    st.balloons()
 
     elif st.session_state.pagina == "pesquisa_lavagens":
         st.header("Pesquisa de Lavagens")
