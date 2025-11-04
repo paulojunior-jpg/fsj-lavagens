@@ -1,4 +1,4 @@
-# app.py - MENU 3 PONTINHOS 100% ALINHADO E COMPACTO
+# app.py - SISTEMA COMPLETO: LOGIN PARA TODOS + CONTROLE DE ACESSO
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -6,7 +6,7 @@ import pandas as pd
 
 st.set_page_config(page_title="FSJ Lavagens", layout="wide")
 
-# CSS OTIMIZADO: MENU COMPACTO E ALINHADO
+# CSS OTIMIZADO
 st.markdown("""
 <style>
     .sidebar .sidebar-content {
@@ -32,19 +32,10 @@ st.markdown("""
         max-height: 300px;
         opacity: 1;
     }
-    /* MENU 3 PONTINHOS - COMPACTO E ALINHADO */
     div[data-testid="column"]:last-child {
         display: flex;
         justify-content: center;
         align-items: center;
-    }
-    .action-expander {
-        width: 40px !important;
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-    .action-expander > div {
-        padding: 0 !important;
     }
     .action-button {
         width: 100% !important;
@@ -60,7 +51,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Banco de dados
+# BANCO DE DADOS
 def init_db():
     conn = sqlite3.connect('fsj_lavagens.db')
     c = conn.cursor()
@@ -85,6 +76,7 @@ def init_db():
         observacoes TEXT,
         usuario_criacao TEXT
     )''')
+    # Usuário admin padrão
     c.execute('INSERT OR IGNORE INTO usuarios (nome, email, senha, nivel, data_cadastro) VALUES (?, ?, ?, ?, ?)',
               ('Admin FSJ', 'admin@fsj.com', 'fsj123', 'admin', datetime.now().strftime('%d/%m/%Y %H:%M')))
     conn.commit()
@@ -92,7 +84,7 @@ def init_db():
 
 init_db()
 
-# Funções
+# FUNÇÕES
 def criar_usuario(nome, email, senha, nivel):
     conn = sqlite3.connect('fsj_lavagens.db')
     c = conn.cursor()
@@ -102,7 +94,7 @@ def criar_usuario(nome, email, senha, nivel):
                   (nome, email, senha, nivel, data_cad))
         conn.commit()
         return True
-    except:
+    except sqlite3.IntegrityError:
         return False
     finally:
         conn.close()
@@ -155,7 +147,7 @@ def sair():
     st.session_state.nivel = ""
     st.rerun()
 
-# Estado
+# ESTADO
 if 'pagina' not in st.session_state:
     st.session_state.pagina = "login"
 if 'lavagem_expandido' not in st.session_state:
@@ -167,7 +159,7 @@ if 'editando' not in st.session_state:
 if 'confirmar_exclusao' not in st.session_state:
     st.session_state.confirmar_exclusao = None
 
-# Login
+# LOGIN
 if st.session_state.pagina == "login":
     st.title("FSJ Logística - Gerenciador de Lavagens")
     st.subheader("Faça Login")
@@ -193,6 +185,7 @@ else:
         st.button("Sair", on_click=sair, use_container_width=True)
         st.markdown("---")
 
+        # LAVAGEM
         st.markdown('<div class="menu-title">Lavagem</div>', unsafe_allow_html=True)
         submenu_lav = "submenu expanded" if st.session_state.lavagem_expandido else "submenu collapsed"
         st.markdown(f'<div class="{submenu_lav}">', unsafe_allow_html=True)
@@ -204,6 +197,7 @@ else:
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
+        # USUÁRIOS (SÓ ADMIN)
         if st.session_state.nivel == "admin":
             st.markdown('<div class="menu-title">Usuários</div>', unsafe_allow_html=True)
             submenu_usr = "submenu expanded" if st.session_state.usuarios_expandido else "submenu collapsed"
@@ -273,7 +267,7 @@ else:
                 cols[3].write(row['nivel'].title())
                 
                 with cols[4]:
-                    with st.expander("⋮", expanded=False):
+                    with st.expander("...", expanded=False):
                         col_btn1, col_btn2 = st.columns(2)
                         with col_btn1:
                             if st.button("Alterar", key=f"edit_{row['id']}", use_container_width=True):
@@ -292,7 +286,7 @@ else:
                                     st.warning("Clique novamente para confirmar.")
                                     st.rerun()
 
-            # Formulário de edição
+            # FORMULÁRIO DE EDIÇÃO
             if st.session_state.editando is not None:
                 user_df = df[df['id'] == st.session_state.editando]
                 if not user_df.empty:
@@ -326,7 +320,7 @@ else:
                             del st.session_state.editando
                             st.rerun()
 
-            # Download
+            # DOWNLOAD
             df_display = df[['nome', 'email', 'data_cadastro', 'nivel']].copy()
             st.download_button("Baixar Lista (CSV)", df_display.to_csv(index=False).encode('utf-8'), "funcionarios.csv", "text/csv")
         else:
