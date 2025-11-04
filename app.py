@@ -1,4 +1,4 @@
-# app.py - PESQUISA VEÍCULOS COM ALTERAR/EXCLUIR
+# app.py - TABELA DE VEÍCULOS COM ÍCONES DE AÇÃO (EDITAR/EXCLUIR)
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -7,7 +7,7 @@ import re
 
 st.set_page_config(page_title="FSJ Lavagens", layout="wide")
 
-# CSS
+# CSS MODERNO E PROFISSIONAL
 st.markdown("""
 <style>
     .sidebar .sidebar-content {
@@ -25,25 +25,20 @@ st.markdown("""
         transition: max-height 0.4s ease, opacity 0.4s ease;
         margin-left: 10px;
     }
-    .submenu.collapsed {
-        max-height: 0;
-        opacity: 0;
+    .action-btn {
+        font-size: 11px !important;
+        padding: 4px 8px !important;
+        margin: 0 2px !important;
     }
-    .submenu.expanded {
-        max-height: 300px;
-        opacity: 1;
+    .action-btn-edit {
+        background-color: #e3f2fd !important;
+        color: #1976d2 !important;
     }
-    div[data-testid="column"]:last-child {
-        display: flex;
-        justify-content: center;
-        align-items: center;
+    .action-btn-delete {
+        background-color: #ffebee !important;
+        color: #d32f2f !important;
     }
-    .action-button {
-        width: 100% !important;
-        text-align: center !important;
-        padding: 6px 4px !important;
-        margin: 1px 0 !important;
-        font-size: 12px !important;
+    .stButton > button {
         border-radius: 6px !important;
     }
 </style>
@@ -343,37 +338,47 @@ else:
                 else:
                     st.error("Placa inválida! Use: ABC1D23")
 
-    # PESQUISA DE VEÍCULOS COM 3 PONTINHOS
+    # PESQUISA DE VEÍCULOS COM ÍCONES
     elif st.session_state.pagina == "pesquisa_veiculos":
         st.header("Pesquisa de Veículos")
         df = listar_veiculos()
         if not df.empty:
+            # Cabeçalho
+            header_cols = st.columns([2, 2.5, 2.5, 2, 1.5])
+            header_cols[0].write("**Placa**")
+            header_cols[1].write("**Tipo**")
+            header_cols[2].write("**Modelo/Marca**")
+            header_cols[3].write("**Data Cadastro**")
+            header_cols[4].write("**Ações**")
+
+            st.markdown("---")
+
+            # Linhas
             for _, row in df.iterrows():
-                cols = st.columns([2, 2.5, 2.5, 2, 0.5])
+                cols = st.columns([2, 2.5, 2.5, 2, 1.5])
                 cols[0].write(row['placa'])
                 cols[1].write(row['tipo'])
                 cols[2].write(row['modelo_marca'] or "-")
                 cols[3].write(row['data_cadastro'])
                 
                 with cols[4]:
-                    with st.expander("...", expanded=False):
-                        col_btn1, col_btn2 = st.columns(2)
-                        with col_btn1:
-                            if st.button("Alterar", key=f"edit_veic_{row['id']}", use_container_width=True):
-                                st.session_state.editando_veiculo = row['id']
+                    col_edit, col_del = st.columns(2)
+                    with col_edit:
+                        if st.button("Editar", key=f"edit_{row['id']}", help="Editar veículo"):
+                            st.session_state.editando_veiculo = row['id']
+                            st.rerun()
+                    with col_del:
+                        if st.button("Excluir", key=f"del_{row['id']}", help="Excluir veículo"):
+                            if st.session_state.get('confirmar_exclusao_veiculo') == row['id']:
+                                excluir_veiculo(row['id'])
+                                st.success("Veículo excluído!")
+                                if 'confirmar_exclusao_veiculo' in st.session_state:
+                                    del st.session_state.confirmar_exclusao_veiculo
                                 st.rerun()
-                        with col_btn2:
-                            if st.button("Excluir", key=f"del_veic_{row['id']}", type="secondary", use_container_width=True):
-                                if st.session_state.get('confirmar_exclusao_veiculo') == row['id']:
-                                    excluir_veiculo(row['id'])
-                                    st.success("Veículo excluído!")
-                                    if 'confirmar_exclusao_veiculo' in st.session_state:
-                                        del st.session_state.confirmar_exclusao_veiculo
-                                    st.rerun()
-                                else:
-                                    st.session_state.confirmar_exclusao_veiculo = row['id']
-                                    st.warning("Clique novamente para confirmar.")
-                                    st.rerun()
+                            else:
+                                st.session_state.confirmar_exclusao_veiculo = row['id']
+                                st.warning("Clique novamente para confirmar.")
+                                st.rerun()
 
             # FORMULÁRIO DE EDIÇÃO
             if st.session_state.editando_veiculo is not None:
