@@ -1,4 +1,4 @@
-# app.py - IMPORTAÇÃO EM MASSA + ERRO DE SINTAXE CORRIGIDO
+# app.py - IMPORTAÇÃO EM MASSA COM openpyxl (SEM xlsxwriter)
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -171,7 +171,7 @@ def listar_veiculos():
 # IMPORTAÇÃO EM MASSA
 def importar_veiculos_excel(file):
     try:
-        df = pd.read_excel(file)
+        df = pd.read_excel(file, engine='openpyxl')
     except Exception as e:
         return False, [], f"Erro ao ler arquivo: {e}"
 
@@ -435,7 +435,7 @@ else:
                 else:
                     st.error("Placa inválida! Use: ABC1D23")
 
-    # PESQUISA DE VEÍCULOS COM IMPORTAÇÃO
+    # PESQUISA DE VEÍCULOS COM IMPORTAÇÃO (CORRIGIDO)
     elif st.session_state.pagina == "pesquisa_veiculos":
         st.header("Pesquisa de Veículos")
 
@@ -461,15 +461,14 @@ else:
                     else:
                         st.error(f"Erro: {erros}")
 
-            # TEMPLATE
+            # TEMPLATE COM openpyxl
             template = pd.DataFrame({
                 "PLACA": ["ABC1D23", "XYZ9E87"],
                 "TIPO DO VEÍCULO": ["TRUCK", "CONJUNTO BITREM"],
                 "MODELO/MARCA": ["Scania R450", "Volvo FH"]
             })
             output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                template.to_excel(writer, index=False, sheet_name='Veiculos')
+            template.to_excel(output, index=False, engine='openpyxl')
             output.seek(0)
             st.download_button(
                 label="Baixar Modelo Excel",
