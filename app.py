@@ -1,4 +1,4 @@
-# app.py - TABELA DE VEÍCULOS COM ÍCONES DE AÇÃO (EDITAR/EXCLUIR)
+# app.py - PESQUISA DE USUÁRIOS COM ÍCONES DE AÇÃO (EDITAR/EXCLUIR)
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -98,6 +98,30 @@ def criar_usuario(nome, email, senha, nivel):
     finally:
         conn.close()
 
+def editar_usuario(id_usuario, nome, email, senha, nivel):
+    conn = sqlite3.connect('fsj_lavagens.db')
+    c = conn.cursor()
+    try:
+        if senha:
+            c.execute('UPDATE usuarios SET nome=?, email=?, senha=?, nivel=? WHERE id=?',
+                      (nome, email, senha, nivel, id_usuario))
+        else:
+            c.execute('UPDATE usuarios SET nome=?, email=?, nivel=? WHERE id=?',
+                      (nome, email, nivel, id_usuario))
+        conn.commit()
+        return True
+    except:
+        return False
+    finally:
+        conn.close()
+
+def excluir_usuario(id_usuario):
+    conn = sqlite3.connect('fsj_lavagens.db')
+    c = conn.cursor()
+    c.execute('DELETE FROM usuarios WHERE id = ?', (id_usuario,))
+    conn.commit()
+    conn.close()
+
 def validar_login(email, senha):
     conn = sqlite3.connect('fsj_lavagens.db')
     c = conn.cursor()
@@ -196,6 +220,10 @@ if 'usuarios_expandido' not in st.session_state:
     st.session_state.usuarios_expandido = True
 if 'veiculos_expandido' not in st.session_state:
     st.session_state.veiculos_expandido = True
+if 'editando_usuario' not in st.session_state:
+    st.session_state.editando_usuario = None
+if 'confirmar_exclusao_usuario' not in st.session_state:
+    st.session_state.confirmar_exclusao_usuario = None
 if 'editando_veiculo' not in st.session_state:
     st.session_state.editando_veiculo = None
 if 'confirmar_exclusao_veiculo' not in st.session_state:
@@ -310,12 +338,78 @@ else:
                 else:
                     st.error("Preencha todos os campos!")
 
+    # PESQUISA DE USUÁRIOS COM ÍCONES
     elif st.session_state.pagina == "pesquisa_usuarios":
         st.header("Lista de Funcionários")
         df = listar_usuarios()
         if not df.empty:
-            st.dataframe(df[['nome', 'email', 'data_cadastro', 'nivel']], use_container_width=True)
-            st.download_button("Baixar CSV", df.to_csv(index=False), "funcionarios.csv")
+            # Cabeçalho
+            header_cols = st.columns([3, 3, 2, 1.5, 1.5])
+            header_cols[0].write("**Nome**")
+            header_cols[1].write("**E-mail**")
+            header_cols[2].write("**Data Cadastro**")
+            header_cols[3].write("**Nível**")
+            header_cols[4].write("**Ações**")
+
+            st.markdown("---")
+
+            # Linhas
+            for _, row in df.iterrows():
+                cols = st.columns([3, 3, 2, 1.5, 1.5])
+                cols[0].write(row['nome'])
+                cols[1].write(row['email'])
+                cols[2].write(row['data_cadastro'])
+                cols[3].write(row['nivel'].title())
+                
+                with cols[4]:
+                    col_edit, col_del = st.columns(2)
+                    with col_edit:
+                        if st.button("Editar", key=f"edit_usr_{row['id']}", help="Editar usuário"):
+                            st.session_state.editando_usuario = row['id']
+                            st.rerun()
+                    with col_del:
+                        if st.button("Excluir", key=f"del_usr_{row['id']}", help="Excluir usuário"):
+                            if st.session_state.get('confirmar_exclusao_usuario') == row['id']:
+                                excluir_usuario(row['id'])
+                                st.success("Usuário excluído!")
+                                if 'confirmar_exclusao_usuario' in st.session_state:
+                                    del st.session_state.confirmar_exclusao_usuario
+                                st.rerun()
+                            else:
+                                st.session_state.confirmar_exclusao_usuario = row['id']
+                                st.warning("Clique novamente para confirmar.")
+                                st.rerun()
+
+            # FORMULÁRIO DE EDIÇÃO
+            if st.session_state.editando_usuario is not None:
+                user_df = df[df['id'] == st.session_state.editando_usuario]
+                if not user_df.empty:
+                    user = user_df.iloc[0]
+                    st.markdown("---")
+                    st.subheader(f"Editando: {user['nome']}")
+                    with st.form("editar_usuario"):
+                        novo_nome = st.text_input("Nome Completo", value=user['nome'])
+                        novo_email = st.text_input("E-mail", value=user['email'])
+                        nova_senha = st.text_input("Nova Senha (deixe em branco para manter)", type="password")
+                        novo_nivel = st.selectbox("Nível", ["operador", "admin"], 
+                                                index=0 if user['nivel'] == 'operador' else 1)
+                        
+                        col1, col2 = st.columns(2)
+                        if col1.form_submit_button("Salvar"):
+                            if editar_usuario(st.session_state.editando_usuario, novo_nome, novo_email, nova_senha, novo_nivel):
+                                st.success("Usuário atualizado!")
+                                del st.session_state.editando_usuario
+                                st.rerun()
+                            else:
+                                st.error("E-mail já existe!")
+                        
+                        if col2.form_submit_button("Cancelar"):
+                            del st.session_state.editando_usuario
+                            st.rerun()
+
+            # DOWNLOAD
+            df_display = df[['nome', 'email', 'data_cadastro', 'nivel']].copy()
+            st.download_button("Baixar Lista (CSV)", df_display.to_csv(index=False).encode('utf-8'), "funcionarios.csv", "text/csv")
         else:
             st.info("Nenhum usuário cadastrado.")
 
@@ -338,12 +432,11 @@ else:
                 else:
                     st.error("Placa inválida! Use: ABC1D23")
 
-    # PESQUISA DE VEÍCULOS COM ÍCONES
+    # PESQUISA DE VEÍCULOS (mantido com ícones)
     elif st.session_state.pagina == "pesquisa_veiculos":
         st.header("Pesquisa de Veículos")
         df = listar_veiculos()
         if not df.empty:
-            # Cabeçalho
             header_cols = st.columns([2, 2.5, 2.5, 2, 1.5])
             header_cols[0].write("**Placa**")
             header_cols[1].write("**Tipo**")
@@ -353,7 +446,6 @@ else:
 
             st.markdown("---")
 
-            # Linhas
             for _, row in df.iterrows():
                 cols = st.columns([2, 2.5, 2.5, 2, 1.5])
                 cols[0].write(row['placa'])
@@ -364,11 +456,11 @@ else:
                 with cols[4]:
                     col_edit, col_del = st.columns(2)
                     with col_edit:
-                        if st.button("Editar", key=f"edit_{row['id']}", help="Editar veículo"):
+                        if st.button("Editar", key=f"edit_veic_{row['id']}", help="Editar veículo"):
                             st.session_state.editando_veiculo = row['id']
                             st.rerun()
                     with col_del:
-                        if st.button("Excluir", key=f"del_{row['id']}", help="Excluir veículo"):
+                        if st.button("Excluir", key=f"del_veic_{row['id']}", help="Excluir veículo"):
                             if st.session_state.get('confirmar_exclusao_veiculo') == row['id']:
                                 excluir_veiculo(row['id'])
                                 st.success("Veículo excluído!")
@@ -380,7 +472,6 @@ else:
                                 st.warning("Clique novamente para confirmar.")
                                 st.rerun()
 
-            # FORMULÁRIO DE EDIÇÃO
             if st.session_state.editando_veiculo is not None:
                 veic_df = df[df['id'] == st.session_state.editando_veiculo]
                 if not veic_df.empty:
@@ -414,7 +505,6 @@ else:
                             del st.session_state.editando_veiculo
                             st.rerun()
 
-            # DOWNLOAD
             df_display = df[['placa', 'tipo', 'modelo_marca', 'data_cadastro']].copy()
             st.download_button("Baixar CSV", df_display.to_csv(index=False).encode('utf-8'), "veiculos.csv", "text/csv")
         else:
