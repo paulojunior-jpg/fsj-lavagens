@@ -1,9 +1,9 @@
-# app.py - SISTEMA COM ÁRVORE VEÍCULOS (CADASTRO + PESQUISA)
+# app.py - SISTEMA COM ÁREA VEÍCULOS + CADASTRO E PESQUISA
 import streamlit as st
 import sqlite3
 from datetime import datetime
 import pandas as pd
-import re  # para validar placa
+import re  # Para validar placa
 
 st.set_page_config(page_title="FSJ Lavagens", layout="wide")
 
@@ -69,7 +69,6 @@ def init_db():
         modelo_marca TEXT,
         data_cadastro TEXT
     )''')
-    # Usuário admin padrão
     c.execute('INSERT OR IGNORE INTO usuarios (nome, email, senha, nivel, data_cadastro) VALUES (?, ?, ?, ?, ?)',
               ('Admin FSJ', 'admin@fsj.com', 'fsj123', 'admin', datetime.now().strftime('%d/%m/%Y %H:%M')))
     conn.commit()
@@ -78,27 +77,30 @@ def init_db():
 init_db()
 
 # FUNÇÕES VEÍCULOS
-def cadastrar_veiculo(placa, tipo, modelo_marca):
+def criar_veiculo(placa, tipo, modelo_marca):
+    placa = placa.upper().replace("-", "").replace(" ", "")
+    if len(placa) != 7 or not re.match(r"^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$", placa):
+        return False
     conn = sqlite3.connect('fsj_lavagens.db')
     c = conn.cursor()
     data_cad = datetime.now().strftime('%d/%m/%Y %H:%M')
     try:
         c.execute('INSERT INTO veiculos (placa, tipo, modelo_marca, data_cadastro) VALUES (?, ?, ?, ?)',
-                  (placa.upper(), tipo, modelo_marca, data_cad))
+                  (placa, tipo, modelo_marca, data_cad))
         conn.commit()
         return True
-    except sqlite3.IntegrityError:
-        return False  # Placa já existe
+    except:
+        return False
     finally:
         conn.close()
 
 def listar_veiculos():
     conn = sqlite3.connect('fsj_lavagens.db')
-    df = pd.read_sql_query('SELECT placa, tipo, modelo_marca, data_cadastro FROM veiculos ORDER BY data_cadastro DESC', conn)
+    df = pd.read_sql_query('SELECT id, placa, tipo, modelo_marca, data_cadastro FROM veiculos ORDER BY data_cadastro DESC', conn)
     conn.close()
     return df
 
-# FUNÇÕES USUÁRIOS
+# FUNÇÕES USUÁRIOS (resumidas)
 def criar_usuario(nome, email, senha, nivel):
     conn = sqlite3.connect('fsj_lavagens.db')
     c = conn.cursor()
@@ -121,7 +123,7 @@ def validar_login(email, senha):
     conn.close()
     return resultado
 
-# FUNÇÕES LAVAGENS
+# FUNÇÕES LAVAGENS (resumidas)
 def emitir_ordem(placa, motorista, operacao, hora_inicio, hora_fim, obs, usuario):
     conn = sqlite3.connect('fsj_lavagens.db')
     c = conn.cursor()
@@ -197,12 +199,12 @@ else:
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # USUÁRIOS (só admin)
+        # USUÁRIOS (ADMIN)
         if st.session_state.nivel == "admin":
             st.markdown('<div class="menu-title">Usuários</div>', unsafe_allow_html=True)
             submenu_usr = "submenu expanded" if st.session_state.usuarios_expandido else "submenu collapsed"
             st.markdown(f'<div class="{submenu_usr}">', unsafe_allow_html=True)
-            if st.button("Cadastro", key="btn_cadastro_usr", use_container_width=True):
+            if st.button("Cadastro", key="btn_cadastro", use_container_width=True):
                 st.session_state.pagina = "cadastro_usuario"
                 st.rerun()
             if st.button("Pesquisa", key="btn_pesquisa_usr", use_container_width=True):
@@ -210,7 +212,8 @@ else:
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
-            # VEÍCULOS (só admin)
+        # VEÍCULOS (ADMIN)
+        if st.session_state.nivel == "admin":
             st.markdown('<div class="menu-title">Veículos</div>', unsafe_allow_html=True)
             submenu_veic = "submenu expanded" if st.session_state.veiculos_expandido else "submenu collapsed"
             st.markdown(f'<div class="{submenu_veic}">', unsafe_allow_html=True)
@@ -280,28 +283,27 @@ else:
     elif st.session_state.pagina == "cadastro_veiculo":
         st.header("Cadastrar Veículo")
         with st.form("novo_veiculo"):
-            placa = st.text_input("**Placa** (7 caracteres)", maxlength=7, placeholder="ABC1234").upper()
-            tipo = st.selectbox("Tipo", [
+            placa = st.text_input("**PLACA** (7 caracteres: ABC1D23)", max_chars=7).upper()
+            tipo = st.selectbox("TIPO", [
                 "Cavalo", "Reboque", "Reboque Bitrem", "Carreta", "Prancha", 
                 "Reboque Refrig.", "Cavalo Bitrem", "VUC", "Truck", "Toco", "Passeio"
             ])
-            modelo_marca = st.text_input("Modelo/Marca", placeholder="Ex: Volvo FH")
-            
+            modelo_marca = st.text_input("MODELO/MARCA", max_chars=30)
             if st.form_submit_button("Cadastrar Veículo"):
-                if len(placa) == 7 and re.match("^[A-Z0-9]{7}$", placa):
-                    if cadastrar_veiculo(placa, tipo, modelo_marca):
+                if len(placa) == 7 and re.match(r"^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$", placa):
+                    if criar_veiculo(placa, tipo, modelo_marca):
                         st.success(f"Veículo **{placa}** cadastrado!")
                     else:
                         st.error("Placa já cadastrada!")
                 else:
-                    st.error("Placa deve ter exatamente 7 caracteres (letras e números)!")
+                    st.error("Placa inválida! Use: ABC1D23")
 
     # PESQUISA DE VEÍCULOS
     elif st.session_state.pagina == "pesquisa_veiculos":
         st.header("Pesquisa de Veículos")
         df = listar_veiculos()
         if not df.empty:
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df[['placa', 'tipo', 'modelo_marca', 'data_cadastro']], use_container_width=True)
             st.download_button("Baixar CSV", df.to_csv(index=False), "veiculos.csv")
         else:
             st.info("Nenhum veículo cadastrado.")
