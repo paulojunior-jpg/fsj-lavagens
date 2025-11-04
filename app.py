@@ -1,4 +1,4 @@
-# app.py - SISTEMA COMPLETO COM MENU 3 PONTINHOS CORRIGIDO
+# app.py - MENU 3 PONTINHOS COM BOTÕES ALINHADOS E RESPONSIVOS
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -6,7 +6,7 @@ import pandas as pd
 
 st.set_page_config(page_title="FSJ Lavagens", layout="wide")
 
-# CSS para animações suaves e estilo
+# CSS MELHORADO: BOTÕES 100% + ALINHAMENTO PERFEITO
 st.markdown("""
 <style>
     .sidebar .sidebar-content {
@@ -22,24 +22,6 @@ st.markdown("""
         align-items: center;
         gap: 8px;
     }
-    .menu-item {
-        padding: 10px 15px;
-        margin: 3px 0;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        font-size: 14px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .menu-item:hover {
-        background-color: #e3f2fd;
-        transform: translateX(4px);
-    }
-    .menu-item:active {
-        background-color: #bbdefb;
-    }
     .submenu {
         overflow: hidden;
         transition: max-height 0.4s ease, opacity 0.4s ease;
@@ -52,6 +34,24 @@ st.markdown("""
     .submenu.expanded {
         max-height: 300px;
         opacity: 1;
+    }
+    /* MENU DE 3 PONTINHOS */
+    .action-expander {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .action-expander > div > div {
+        padding: 4px 0 !important;
+    }
+    .action-button {
+        width: 100% !important;
+        text-align: left !important;
+        padding: 6px 10px !important;
+        margin: 2px 0 !important;
+        font-size: 13px !important;
+    }
+    .action-button:hover {
+        background-color: #e3f2fd !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -88,7 +88,7 @@ def init_db():
 
 init_db()
 
-# Funções do sistema
+# Funções
 def criar_usuario(nome, email, senha, nivel):
     conn = sqlite3.connect('fsj_lavagens.db')
     c = conn.cursor()
@@ -116,20 +116,6 @@ def listar_usuarios():
     df = pd.read_sql_query('SELECT id, nome, email, senha, nivel, data_cadastro FROM usuarios ORDER BY data_cadastro DESC', conn)
     conn.close()
     return df
-
-def alterar_senha(email, nova_senha):
-    conn = sqlite3.connect('fsj_lavagens.db')
-    c = conn.cursor()
-    c.execute('UPDATE usuarios SET senha = ? WHERE email = ?', (nova_senha, email))
-    conn.commit()
-    conn.close()
-
-def alterar_nivel(email, novo_nivel):
-    conn = sqlite3.connect('fsj_lavagens.db')
-    c = conn.cursor()
-    c.execute('UPDATE usuarios SET nivel = ? WHERE email = ?', (novo_nivel, email))
-    conn.commit()
-    conn.close()
 
 def excluir_usuario(user_id):
     conn = sqlite3.connect('fsj_lavagens.db')
@@ -165,7 +151,7 @@ def sair():
     st.session_state.nivel = ""
     st.rerun()
 
-# Estado da página
+# Estado
 if 'pagina' not in st.session_state:
     st.session_state.pagina = "login"
 if 'lavagem_expandido' not in st.session_state:
@@ -203,43 +189,27 @@ else:
         st.button("Sair", on_click=sair, use_container_width=True)
         st.markdown("---")
 
-        # TÍTULO: Lavagem
-        st.markdown("""
-        <div class="menu-title">
-            Lavagem
-        </div>
-        """, unsafe_allow_html=True)
-
+        st.markdown('<div class="menu-title">Lavagem</div>', unsafe_allow_html=True)
         submenu_lav = "submenu expanded" if st.session_state.lavagem_expandido else "submenu collapsed"
         st.markdown(f'<div class="{submenu_lav}">', unsafe_allow_html=True)
-
         if st.button("Emitir Ordem de Lavagem", key="btn_emitir", use_container_width=True):
             st.session_state.pagina = "emitir_ordem"
             st.rerun()
         if st.button("Pesquisa de Lavagens", key="btn_pesquisa_lav", use_container_width=True):
             st.session_state.pagina = "pesquisa_lavagens"
             st.rerun()
-
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # TÍTULO: Usuários (só admin)
         if st.session_state.nivel == "admin":
-            st.markdown("""
-            <div class="menu-title">
-                Usuários
-            </div>
-            """, unsafe_allow_html=True)
-
+            st.markdown('<div class="menu-title">Usuários</div>', unsafe_allow_html=True)
             submenu_usr = "submenu expanded" if st.session_state.usuarios_expandido else "submenu collapsed"
             st.markdown(f'<div class="{submenu_usr}">', unsafe_allow_html=True)
-
             if st.button("Cadastro", key="btn_cadastro", use_container_width=True):
                 st.session_state.pagina = "cadastro_usuario"
                 st.rerun()
             if st.button("Pesquisa", key="btn_pesquisa_usr", use_container_width=True):
                 st.session_state.pagina = "pesquisa_usuarios"
                 st.rerun()
-
             st.markdown('</div>', unsafe_allow_html=True)
 
     # PÁGINAS
@@ -291,7 +261,6 @@ else:
         st.header("Lista de Funcionários")
         df = listar_usuarios()
         if not df.empty:
-            # Exibir tabela com 3 pontinhos
             for _, row in df.iterrows():
                 cols = st.columns([3, 3, 2, 2, 0.5])
                 cols[0].write(row['nome'])
@@ -301,10 +270,11 @@ else:
                 
                 with cols[4]:
                     with st.expander("⋮", expanded=False):
-                        if st.button("Alterar", key=f"edit_{row['id']}"):
+                        st.markdown("<style>.action-button {width:100%}</style>", unsafe_allow_html=True)
+                        if st.button("Alterar", key=f"edit_{row['id']}", use_container_width=True):
                             st.session_state.editando = row['id']
                             st.rerun()
-                        if st.button("Excluir", key=f"del_{row['id']}", type="secondary"):
+                        if st.button("Excluir", key=f"del_{row['id']}", type="secondary", use_container_width=True):
                             if st.session_state.get('confirmar_exclusao') == row['id']:
                                 excluir_usuario(row['id'])
                                 st.success("Usuário excluído!")
@@ -313,13 +283,12 @@ else:
                                 st.rerun()
                             else:
                                 st.session_state.confirmar_exclusao = row['id']
-                                st.warning("Clique novamente para confirmar exclusão.")
+                                st.warning("Clique novamente para confirmar.")
                                 st.rerun()
 
             # Formulário de edição
-            if 'editando' in st.session_state and st.session_state.editando is not None:
-                user_id = st.session_state.editando
-                user_df = df[df['id'] == user_id]
+            if st.session_state.editando is not None:
+                user_df = df[df['id'] == st.session_state.editando]
                 if not user_df.empty:
                     user = user_df.iloc[0]
                     st.markdown("---")
@@ -337,10 +306,10 @@ else:
                             c = conn.cursor()
                             if nova_senha:
                                 c.execute('UPDATE usuarios SET nome=?, email=?, senha=?, nivel=? WHERE id=?',
-                                          (novo_nome, novo_email, nova_senha, novo_nivel, user_id))
+                                          (novo_nome, novo_email, nova_senha, novo_nivel, st.session_state.editando))
                             else:
                                 c.execute('UPDATE usuarios SET nome=?, email=?, nivel=? WHERE id=?',
-                                          (novo_nome, novo_email, novo_nivel, user_id))
+                                          (novo_nome, novo_email, novo_nivel, st.session_state.editando))
                             conn.commit()
                             conn.close()
                             st.success("Usuário atualizado!")
@@ -350,19 +319,10 @@ else:
                         if col2.form_submit_button("Cancelar"):
                             del st.session_state.editando
                             st.rerun()
-                else:
-                    st.error("Usuário não encontrado.")
-            else:
-                st.session_state.editando = None
 
-            # Botão de download
+            # Download
             df_display = df[['nome', 'email', 'data_cadastro', 'nivel']].copy()
-            st.download_button(
-                "Baixar Lista (CSV)",
-                df_display.to_csv(index=False).encode('utf-8'),
-                "funcionarios.csv",
-                "text/csv"
-            )
+            st.download_button("Baixar Lista (CSV)", df_display.to_csv(index=False).encode('utf-8'), "funcionarios.csv", "text/csv")
         else:
             st.info("Nenhum usuário cadastrado.")
 
