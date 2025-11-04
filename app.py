@@ -1,4 +1,4 @@
-# app.py - PESQUISA DE USUÁRIOS COM ÍCONES DE AÇÃO (EDITAR/EXCLUIR)
+# app.py - TIPO DO VEÍCULO ATUALIZADO
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -7,7 +7,7 @@ import re
 
 st.set_page_config(page_title="FSJ Lavagens", layout="wide")
 
-# CSS MODERNO E PROFISSIONAL
+# CSS MODERNO
 st.markdown("""
 <style>
     .sidebar .sidebar-content {
@@ -30,19 +30,22 @@ st.markdown("""
         padding: 4px 8px !important;
         margin: 0 2px !important;
     }
-    .action-btn-edit {
-        background-color: #e3f2fd !important;
-        color: #1976d2 !important;
-    }
-    .action-btn-delete {
-        background-color: #ffebee !important;
-        color: #d32f2f !important;
-    }
     .stButton > button {
         border-radius: 6px !important;
     }
 </style>
 """, unsafe_allow_html=True)
+
+# TIPOS DE VEÍCULO (ATUALIZADOS)
+TIPOS_VEICULO = [
+    "TRUCK",
+    "CONJUNTO LS",
+    "REBOQUE",
+    "CAVALO",
+    "CAMINHÃO 3/4",
+    "CONJUNTO BITREM",
+    "PRANCHA"
+]
 
 # BANCO DE DADOS
 def init_db():
@@ -338,22 +341,19 @@ else:
                 else:
                     st.error("Preencha todos os campos!")
 
-    # PESQUISA DE USUÁRIOS COM ÍCONES
+    # PESQUISA DE USUÁRIOS
     elif st.session_state.pagina == "pesquisa_usuarios":
         st.header("Lista de Funcionários")
         df = listar_usuarios()
         if not df.empty:
-            # Cabeçalho
             header_cols = st.columns([3, 3, 2, 1.5, 1.5])
             header_cols[0].write("**Nome**")
             header_cols[1].write("**E-mail**")
             header_cols[2].write("**Data Cadastro**")
             header_cols[3].write("**Nível**")
             header_cols[4].write("**Ações**")
-
             st.markdown("---")
 
-            # Linhas
             for _, row in df.iterrows():
                 cols = st.columns([3, 3, 2, 1.5, 1.5])
                 cols[0].write(row['nome'])
@@ -380,7 +380,6 @@ else:
                                 st.warning("Clique novamente para confirmar.")
                                 st.rerun()
 
-            # FORMULÁRIO DE EDIÇÃO
             if st.session_state.editando_usuario is not None:
                 user_df = df[df['id'] == st.session_state.editando_usuario]
                 if not user_df.empty:
@@ -407,21 +406,17 @@ else:
                             del st.session_state.editando_usuario
                             st.rerun()
 
-            # DOWNLOAD
             df_display = df[['nome', 'email', 'data_cadastro', 'nivel']].copy()
             st.download_button("Baixar Lista (CSV)", df_display.to_csv(index=False).encode('utf-8'), "funcionarios.csv", "text/csv")
         else:
             st.info("Nenhum usuário cadastrado.")
 
-    # CADASTRO DE VEÍCULO
+    # CADASTRO DE VEÍCULO (TIPO ATUALIZADO)
     elif st.session_state.pagina == "cadastro_veiculo":
         st.header("Cadastrar Veículo")
         with st.form("novo_veiculo"):
             placa = st.text_input("**PLACA** (7 caracteres: ABC1D23)", max_chars=7).upper()
-            tipo = st.selectbox("TIPO", [
-                "Cavalo", "Reboque", "Reboque Bitrem", "Carreta", "Prancha", 
-                "Reboque Refrig.", "Cavalo Bitrem", "VUC", "Truck", "Toco", "Passeio"
-            ])
+            tipo = st.selectbox("**TIPO DO VEÍCULO**", TIPOS_VEICULO)
             modelo_marca = st.text_input("MODELO/MARCA", max_chars=30)
             if st.form_submit_button("Cadastrar Veículo"):
                 if len(placa) == 7 and re.match(r"^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$", placa):
@@ -432,18 +427,17 @@ else:
                 else:
                     st.error("Placa inválida! Use: ABC1D23")
 
-    # PESQUISA DE VEÍCULOS (mantido com ícones)
+    # PESQUISA DE VEÍCULOS (TIPO ATUALIZADO)
     elif st.session_state.pagina == "pesquisa_veiculos":
         st.header("Pesquisa de Veículos")
         df = listar_veiculos()
         if not df.empty:
             header_cols = st.columns([2, 2.5, 2.5, 2, 1.5])
             header_cols[0].write("**Placa**")
-            header_cols[1].write("**Tipo**")
+            header_cols[1].write("**Tipo do Veículo**")
             header_cols[2].write("**Modelo/Marca**")
             header_cols[3].write("**Data Cadastro**")
             header_cols[4].write("**Ações**")
-
             st.markdown("---")
 
             for _, row in df.iterrows():
@@ -480,13 +474,8 @@ else:
                     st.subheader(f"Editando Veículo: {veic['placa']}")
                     with st.form("editar_veiculo"):
                         nova_placa = st.text_input("PLACA", value=veic['placa'], max_chars=7).upper()
-                        novo_tipo = st.selectbox("TIPO", [
-                            "Cavalo", "Reboque", "Reboque Bitrem", "Carreta", "Prancha", 
-                            "Reboque Refrig.", "Cavalo Bitrem", "VUC", "Truck", "Toco", "Passeio"
-                        ], index=[
-                            "Cavalo", "Reboque", "Reboque Bitrem", "Carreta", "Prancha", 
-                            "Reboque Refrig.", "Cavalo Bitrem", "VUC", "Truck", "Toco", "Passeio"
-                        ].index(veic['tipo']))
+                        novo_tipo = st.selectbox("**TIPO DO VEÍCULO**", TIPOS_VEICULO,
+                                                index=TIPOS_VEICULO.index(veic['tipo']) if veic['tipo'] in TIPOS_VEICULO else 0)
                         novo_modelo = st.text_input("MODELO/MARCA", value=veic['modelo_marca'] or "", max_chars=30)
                         
                         col1, col2 = st.columns(2)
