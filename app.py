@@ -1,4 +1,4 @@
-# app.py - IMPORTAÇÃO EM MASSA COM openpyxl (FUNCIONA NO CLOUD!)
+# app.py - IMPORTAÇÃO EM MASSA + TEMPLATE EM CSV (SEM openpyxl!)
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -461,21 +461,18 @@ else:
                     else:
                         st.error(f"Erro: {erros}")
 
-            # TEMPLATE (AGORA FUNCIONA COM openpyxl)
-            template = pd.DataFrame({
-                "PLACA": ["ABC1D23", "XYZ9E87"],
-                "TIPO DO VEÍCULO": ["TRUCK", "CONJUNTO BITREM"],
-                "MODELO/MARCA": ["Scania R450", "Volvo FH"]
-            })
-            output = io.BytesIO()
-            template.to_excel(output, index=False, engine='openpyxl')
-            output.seek(0)
+            # TEMPLATE EM CSV (SEM openpyxl!)
+            csv_template = """PLACA,TIPO DO VEÍCULO,MODELO/MARCA
+ABC1D23,TRUCK,Scania R450
+XYZ9E87,CONJUNTO BITREM,Volvo FH
+"""
             st.download_button(
-                label="Baixar Modelo Excel",
-                data=output,
-                file_name="modelo_veiculos.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                label="Baixar Modelo (CSV)",
+                data=csv_template,
+                file_name="modelo_veiculos.csv",
+                mime="text/csv"
             )
+            st.info("**Dica**: Abra no Excel e salve como .xlsx se preferir.")
 
         st.markdown("---")
 
