@@ -1,4 +1,4 @@
-# app.py - SISTEMA COMPLETO COM MENU 3 PONTINHOS + ERRO DE INDENTAÇÃO CORRIGIDO
+# app.py - SISTEMA COMPLETO COM MENU 3 PONTINHOS CORRIGIDO
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -52,9 +52,6 @@ st.markdown("""
     .submenu.expanded {
         max-height: 300px;
         opacity: 1;
-    }
-    .action-menu {
-        text-align: center;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -120,6 +117,27 @@ def listar_usuarios():
     conn.close()
     return df
 
+def alterar_senha(email, nova_senha):
+    conn = sqlite3.connect('fsj_lavagens.db')
+    c = conn.cursor()
+    c.execute('UPDATE usuarios SET senha = ? WHERE email = ?', (nova_senha, email))
+    conn.commit()
+    conn.close()
+
+def alterar_nivel(email, novo_nivel):
+    conn = sqlite3.connect('fsj_lavagens.db')
+    c = conn.cursor()
+    c.execute('UPDATE usuarios SET nivel = ? WHERE email = ?', (novo_nivel, email))
+    conn.commit()
+    conn.close()
+
+def excluir_usuario(user_id):
+    conn = sqlite3.connect('fsj_lavagens.db')
+    c = conn.cursor()
+    c.execute('DELETE FROM usuarios WHERE id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+
 def emitir_ordem(placa, motorista, operacao, hora_inicio, hora_fim, obs, usuario):
     conn = sqlite3.connect('fsj_lavagens.db')
     c = conn.cursor()
@@ -154,6 +172,10 @@ if 'lavagem_expandido' not in st.session_state:
     st.session_state.lavagem_expandido = True
 if 'usuarios_expandido' not in st.session_state:
     st.session_state.usuarios_expandido = True
+if 'editando' not in st.session_state:
+    st.session_state.editando = None
+if 'confirmar_exclusao' not in st.session_state:
+    st.session_state.confirmar_exclusao = None
 
 # Login
 if st.session_state.pagina == "login":
@@ -284,11 +306,7 @@ else:
                             st.rerun()
                         if st.button("Excluir", key=f"del_{row['id']}", type="secondary"):
                             if st.session_state.get('confirmar_exclusao') == row['id']:
-                                conn = sqlite3.connect('fsj_lavagens.db')
-                                c = conn.cursor()
-                                c.execute('DELETE FROM usuarios WHERE id = ?', (row['id'],))
-                                conn.commit()
-                                conn.close()
+                                excluir_usuario(row['id'])
                                 st.success("Usuário excluído!")
                                 if 'confirmar_exclusao' in st.session_state:
                                     del st.session_state.confirmar_exclusao
@@ -299,37 +317,43 @@ else:
                                 st.rerun()
 
             # Formulário de edição
-            if 'editando' in st.session_state:
+            if 'editando' in st.session_state and st.session_state.editando is not None:
                 user_id = st.session_state.editando
-                user = df[df['id'] == user_id].iloc[0]
-                st.markdown("---")
-                st.subheader(f"Editando: {user['nome']}")
-                with st.form("editar_usuario"):
-                    novo_nome = st.text_input("Nome Completo", value=user['nome'])
-                    novo_email = st.text_input("E-mail", value=user['email'])
-                    nova_senha = st.text_input("Nova Senha (deixe em branco para manter)", type="password")
-                    novo_nivel = st.selectbox("Nível", ["operador", "admin"], 
-                                            index=0 if user['nivel'] == 'operador' else 1)
-                    
-                    col1, col2 = st.columns(2)
-                    if col1.form_submit_button("Salvar"):
-                        conn = sqlite3.connect('fsj_lavagens.db')
-                        c = conn.cursor()
-                        if nova_senha:
-                            c.execute('UPDATE usuarios SET nome=?, email=?, senha=?, nivel=? WHERE id=?',
-                                      (novo_nome, novo_email, nova_senha, novo_nivel, user_id))
-                        else:
-                            c.execute('UPDATE usuarios SET nome=?, email=?, nivel=? WHERE id=?',
-                                      (novo_nome, novo_email, novo_nivel, user_id))
-                        conn.commit()
-                        conn.close()
-                        st.success("Usuário atualizado!")
-                        del st.session_state.editando
-                        st.rerun()
-                    
-                    if col2.form_submit_button("Cancelar"):
-                        del st.session_state.editando
-                        st.rerun()
+                user_df = df[df['id'] == user_id]
+                if not user_df.empty:
+                    user = user_df.iloc[0]
+                    st.markdown("---")
+                    st.subheader(f"Editando: {user['nome']}")
+                    with st.form("editar_usuario"):
+                        novo_nome = st.text_input("Nome Completo", value=user['nome'])
+                        novo_email = st.text_input("E-mail", value=user['email'])
+                        nova_senha = st.text_input("Nova Senha (deixe em branco para manter)", type="password")
+                        novo_nivel = st.selectbox("Nível", ["operador", "admin"], 
+                                                index=0 if user['nivel'] == 'operador' else 1)
+                        
+                        col1, col2 = st.columns(2)
+                        if col1.form_submit_button("Salvar"):
+                            conn = sqlite3.connect('fsj_lavagens.db')
+                            c = conn.cursor()
+                            if nova_senha:
+                                c.execute('UPDATE usuarios SET nome=?, email=?, senha=?, nivel=? WHERE id=?',
+                                          (novo_nome, novo_email, nova_senha, novo_nivel, user_id))
+                            else:
+                                c.execute('UPDATE usuarios SET nome=?, email=?, nivel=? WHERE id=?',
+                                          (novo_nome, novo_email, novo_nivel, user_id))
+                            conn.commit()
+                            conn.close()
+                            st.success("Usuário atualizado!")
+                            del st.session_state.editando
+                            st.rerun()
+                        
+                        if col2.form_submit_button("Cancelar"):
+                            del st.session_state.editando
+                            st.rerun()
+                else:
+                    st.error("Usuário não encontrado.")
+            else:
+                st.session_state.editando = None
 
             # Botão de download
             df_display = df[['nome', 'email', 'data_cadastro', 'nivel']].copy()
