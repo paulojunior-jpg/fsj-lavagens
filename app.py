@@ -1,12 +1,4 @@
-PRONTO!
-ERRO CORRIGIDO — listar_usuarios() ESTAVA FALTANDO!
-
-PROBLEMA:
-pythonNameError: name 'listar_usuarios' is not defined
-→ A função listar_usuarios() foi removida acidentalmente no último código!
-
-CÓDIGO COMPLETO 100% CORRIGIDO (COLE TODO NO app.py)
-python# app.py - SISTEMA COMPLETO: VEÍCULOS + LISTAR_USUARIOS CORRIGIDO
+# app.py - SISTEMA COMPLETO: VEÍCULOS + LISTAR_USUARIOS CORRIGIDO
 import streamlit as st
 import sqlite3
 from datetime import datetime
