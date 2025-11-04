@@ -1,4 +1,4 @@
-# app.py - IMPORTAÇÃO EM MASSA COM openpyxl (SEM xlsxwriter)
+# app.py - IMPORTAÇÃO EM MASSA COM openpyxl (FUNCIONA NO CLOUD!)
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -435,7 +435,7 @@ else:
                 else:
                     st.error("Placa inválida! Use: ABC1D23")
 
-    # PESQUISA DE VEÍCULOS COM IMPORTAÇÃO (CORRIGIDO)
+    # PESQUISA DE VEÍCULOS COM IMPORTAÇÃO
     elif st.session_state.pagina == "pesquisa_veiculos":
         st.header("Pesquisa de Veículos")
 
@@ -461,7 +461,7 @@ else:
                     else:
                         st.error(f"Erro: {erros}")
 
-            # TEMPLATE COM openpyxl
+            # TEMPLATE (AGORA FUNCIONA COM openpyxl)
             template = pd.DataFrame({
                 "PLACA": ["ABC1D23", "XYZ9E87"],
                 "TIPO DO VEÍCULO": ["TRUCK", "CONJUNTO BITREM"],
