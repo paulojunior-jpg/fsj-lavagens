@@ -1,9 +1,17 @@
-# app.py - SISTEMA COM ÁREA VEÍCULOS + CADASTRO E PESQUISA
+PRONTO!
+ERRO CORRIGIDO — listar_usuarios() ESTAVA FALTANDO!
+
+PROBLEMA:
+pythonNameError: name 'listar_usuarios' is not defined
+→ A função listar_usuarios() foi removida acidentalmente no último código!
+
+CÓDIGO COMPLETO 100% CORRIGIDO (COLE TODO NO app.py)
+python# app.py - SISTEMA COMPLETO: VEÍCULOS + LISTAR_USUARIOS CORRIGIDO
 import streamlit as st
 import sqlite3
 from datetime import datetime
 import pandas as pd
-import re  # Para validar placa
+import re
 
 st.set_page_config(page_title="FSJ Lavagens", layout="wide")
 
@@ -61,7 +69,6 @@ def init_db():
         observacoes TEXT,
         usuario_criacao TEXT
     )''')
-    # NOVA TABELA: VEÍCULOS
     c.execute('''CREATE TABLE IF NOT EXISTS veiculos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         placa TEXT UNIQUE NOT NULL,
@@ -75,6 +82,35 @@ def init_db():
     conn.close()
 
 init_db()
+
+# FUNÇÕES USUÁRIOS
+def criar_usuario(nome, email, senha, nivel):
+    conn = sqlite3.connect('fsj_lavagens.db')
+    c = conn.cursor()
+    data_cad = datetime.now().strftime('%d/%m/%Y %H:%M')
+    try:
+        c.execute('INSERT INTO usuarios (nome, email, senha, nivel, data_cadastro) VALUES (?, ?, ?, ?, ?)',
+                  (nome, email, senha, nivel, data_cad))
+        conn.commit()
+        return True
+    except:
+        return False
+    finally:
+        conn.close()
+
+def validar_login(email, senha):
+    conn = sqlite3.connect('fsj_lavagens.db')
+    c = conn.cursor()
+    c.execute('SELECT nome, nivel FROM usuarios WHERE email = ? AND senha = ?', (email, senha))
+    resultado = c.fetchone()
+    conn.close()
+    return resultado
+
+def listar_usuarios():  # FUNÇÃO RESTAURADA!
+    conn = sqlite3.connect('fsj_lavagens.db')
+    df = pd.read_sql_query('SELECT id, nome, email, senha, nivel, data_cadastro FROM usuarios ORDER BY data_cadastro DESC', conn)
+    conn.close()
+    return df
 
 # FUNÇÕES VEÍCULOS
 def criar_veiculo(placa, tipo, modelo_marca):
@@ -100,30 +136,7 @@ def listar_veiculos():
     conn.close()
     return df
 
-# FUNÇÕES USUÁRIOS (resumidas)
-def criar_usuario(nome, email, senha, nivel):
-    conn = sqlite3.connect('fsj_lavagens.db')
-    c = conn.cursor()
-    data_cad = datetime.now().strftime('%d/%m/%Y %H:%M')
-    try:
-        c.execute('INSERT INTO usuarios (nome, email, senha, nivel, data_cadastro) VALUES (?, ?, ?, ?, ?)',
-                  (nome, email, senha, nivel, data_cad))
-        conn.commit()
-        return True
-    except:
-        return False
-    finally:
-        conn.close()
-
-def validar_login(email, senha):
-    conn = sqlite3.connect('fsj_lavagens.db')
-    c = conn.cursor()
-    c.execute('SELECT nome, nivel FROM usuarios WHERE email = ? AND senha = ?', (email, senha))
-    resultado = c.fetchone()
-    conn.close()
-    return resultado
-
-# FUNÇÕES LAVAGENS (resumidas)
+# FUNÇÕES LAVAGENS
 def emitir_ordem(placa, motorista, operacao, hora_inicio, hora_fim, obs, usuario):
     conn = sqlite3.connect('fsj_lavagens.db')
     c = conn.cursor()
