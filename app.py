@@ -1,4 +1,4 @@
-# app.py - SISTEMA COMPLETO: VEÍCULOS + LISTAR_USUARIOS CORRIGIDO
+# app.py - PESQUISA VEÍCULOS COM ALTERAR/EXCLUIR
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -32,6 +32,19 @@ st.markdown("""
     .submenu.expanded {
         max-height: 300px;
         opacity: 1;
+    }
+    div[data-testid="column"]:last-child {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .action-button {
+        width: 100% !important;
+        text-align: center !important;
+        padding: 6px 4px !important;
+        margin: 1px 0 !important;
+        font-size: 12px !important;
+        border-radius: 6px !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -98,7 +111,7 @@ def validar_login(email, senha):
     conn.close()
     return resultado
 
-def listar_usuarios():  # FUNÇÃO RESTAURADA!
+def listar_usuarios():
     conn = sqlite3.connect('fsj_lavagens.db')
     df = pd.read_sql_query('SELECT id, nome, email, senha, nivel, data_cadastro FROM usuarios ORDER BY data_cadastro DESC', conn)
     conn.close()
@@ -121,6 +134,29 @@ def criar_veiculo(placa, tipo, modelo_marca):
         return False
     finally:
         conn.close()
+
+def editar_veiculo(id_veiculo, placa, tipo, modelo_marca):
+    placa = placa.upper().replace("-", "").replace(" ", "")
+    if len(placa) != 7 or not re.match(r"^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$", placa):
+        return False
+    conn = sqlite3.connect('fsj_lavagens.db')
+    c = conn.cursor()
+    try:
+        c.execute('UPDATE veiculos SET placa = ?, tipo = ?, modelo_marca = ? WHERE id = ?',
+                  (placa, tipo, modelo_marca, id_veiculo))
+        conn.commit()
+        return True
+    except:
+        return False
+    finally:
+        conn.close()
+
+def excluir_veiculo(id_veiculo):
+    conn = sqlite3.connect('fsj_lavagens.db')
+    c = conn.cursor()
+    c.execute('DELETE FROM veiculos WHERE id = ?', (id_veiculo,))
+    conn.commit()
+    conn.close()
 
 def listar_veiculos():
     conn = sqlite3.connect('fsj_lavagens.db')
@@ -165,6 +201,10 @@ if 'usuarios_expandido' not in st.session_state:
     st.session_state.usuarios_expandido = True
 if 'veiculos_expandido' not in st.session_state:
     st.session_state.veiculos_expandido = True
+if 'editando_veiculo' not in st.session_state:
+    st.session_state.editando_veiculo = None
+if 'confirmar_exclusao_veiculo' not in st.session_state:
+    st.session_state.confirmar_exclusao_veiculo = None
 
 # LOGIN
 if st.session_state.pagina == "login":
@@ -303,13 +343,75 @@ else:
                 else:
                     st.error("Placa inválida! Use: ABC1D23")
 
-    # PESQUISA DE VEÍCULOS
+    # PESQUISA DE VEÍCULOS COM 3 PONTINHOS
     elif st.session_state.pagina == "pesquisa_veiculos":
         st.header("Pesquisa de Veículos")
         df = listar_veiculos()
         if not df.empty:
-            st.dataframe(df[['placa', 'tipo', 'modelo_marca', 'data_cadastro']], use_container_width=True)
-            st.download_button("Baixar CSV", df.to_csv(index=False), "veiculos.csv")
+            for _, row in df.iterrows():
+                cols = st.columns([2, 2.5, 2.5, 2, 0.5])
+                cols[0].write(row['placa'])
+                cols[1].write(row['tipo'])
+                cols[2].write(row['modelo_marca'] or "-")
+                cols[3].write(row['data_cadastro'])
+                
+                with cols[4]:
+                    with st.expander("...", expanded=False):
+                        col_btn1, col_btn2 = st.columns(2)
+                        with col_btn1:
+                            if st.button("Alterar", key=f"edit_veic_{row['id']}", use_container_width=True):
+                                st.session_state.editando_veiculo = row['id']
+                                st.rerun()
+                        with col_btn2:
+                            if st.button("Excluir", key=f"del_veic_{row['id']}", type="secondary", use_container_width=True):
+                                if st.session_state.get('confirmar_exclusao_veiculo') == row['id']:
+                                    excluir_veiculo(row['id'])
+                                    st.success("Veículo excluído!")
+                                    if 'confirmar_exclusao_veiculo' in st.session_state:
+                                        del st.session_state.confirmar_exclusao_veiculo
+                                    st.rerun()
+                                else:
+                                    st.session_state.confirmar_exclusao_veiculo = row['id']
+                                    st.warning("Clique novamente para confirmar.")
+                                    st.rerun()
+
+            # FORMULÁRIO DE EDIÇÃO
+            if st.session_state.editando_veiculo is not None:
+                veic_df = df[df['id'] == st.session_state.editando_veiculo]
+                if not veic_df.empty:
+                    veic = veic_df.iloc[0]
+                    st.markdown("---")
+                    st.subheader(f"Editando Veículo: {veic['placa']}")
+                    with st.form("editar_veiculo"):
+                        nova_placa = st.text_input("PLACA", value=veic['placa'], max_chars=7).upper()
+                        novo_tipo = st.selectbox("TIPO", [
+                            "Cavalo", "Reboque", "Reboque Bitrem", "Carreta", "Prancha", 
+                            "Reboque Refrig.", "Cavalo Bitrem", "VUC", "Truck", "Toco", "Passeio"
+                        ], index=[
+                            "Cavalo", "Reboque", "Reboque Bitrem", "Carreta", "Prancha", 
+                            "Reboque Refrig.", "Cavalo Bitrem", "VUC", "Truck", "Toco", "Passeio"
+                        ].index(veic['tipo']))
+                        novo_modelo = st.text_input("MODELO/MARCA", value=veic['modelo_marca'] or "", max_chars=30)
+                        
+                        col1, col2 = st.columns(2)
+                        if col1.form_submit_button("Salvar"):
+                            if len(nova_placa) == 7 and re.match(r"^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$", nova_placa):
+                                if editar_veiculo(st.session_state.editando_veiculo, nova_placa, novo_tipo, novo_modelo):
+                                    st.success("Veículo atualizado!")
+                                    del st.session_state.editando_veiculo
+                                    st.rerun()
+                                else:
+                                    st.error("Placa já existe!")
+                            else:
+                                st.error("Placa inválida!")
+                        
+                        if col2.form_submit_button("Cancelar"):
+                            del st.session_state.editando_veiculo
+                            st.rerun()
+
+            # DOWNLOAD
+            df_display = df[['placa', 'tipo', 'modelo_marca', 'data_cadastro']].copy()
+            st.download_button("Baixar CSV", df_display.to_csv(index=False).encode('utf-8'), "veiculos.csv", "text/csv")
         else:
             st.info("Nenhum veículo cadastrado.")
 
