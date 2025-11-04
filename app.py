@@ -393,7 +393,7 @@ else:
 
         # LAVAGEM
         st.markdown('<div class="menu-title">Lavagem</div>', unsafe_allow_html=True)
-        submenu_lav = "submenu expanded" if st.session_state.lavagem_expand_I do = True else "submenu collapsed"
+        submenu_lav = "submenu expanded" if st.session_state.lavagem_expandido else "submenu collapsed"
         st.markdown(f'<div class="{submenu_lav}">', unsafe_allow_html=True)
         if st.button("Emitir Ordem de Lavagem", key="btn_emitir", use_container_width=True):
             st.session_state.pagina = "emitir_ordem"
