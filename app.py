@@ -1,4 +1,4 @@
-# app.py - FORNECEDORES + TABELA DE PREÇOS + VEÍCULOS (SEM ERROS!)
+# app.py - FSJ LAVAGENS: FORNECEDORES + TABELA DE PREÇOS + EDIÇÃO
 import streamlit as st
 import sqlite3
 from datetime import datetime
@@ -25,7 +25,13 @@ TIPOS_VEICULO = [
     "CAMINHÃO 3/4", "CONJUNTO BITREM", "PRANCHA"
 ]
 
-SERVICOS = ["LAVAGEM EXTERNA", "LAVAGEM INTERNA", "LAVAGEM COMPLETA", "POLIMENTO", "DESINFECÇÃO"]
+# SERVIÇOS ATUALIZADOS
+SERVICOS = [
+    "LAVAGEM COMPLETA",
+    "LAVAGEM + LUBRIFICAÇÃO",
+    "LAVAGEM COMPLETA + LIMPEZA INTERNA",
+    "LAVAGEM INTERNA DO BAU"
+]
 
 # BANCO DE DADOS
 def init_db():
@@ -352,6 +358,14 @@ if 'confirmar_exclusao_forn' not in st.session_state:
     st.session_state.confirmar_exclusao_forn = None
 if 'fornecedor_precos' not in st.session_state:
     st.session_state.fornecedor_precos = None
+if 'editando_preco' not in st.session_state:
+    st.session_state.editando_preco = None
+if 'preco_tipo' not in st.session_state:
+    st.session_state.preco_tipo = ""
+if 'preco_serv' not in st.session_state:
+    st.session_state.preco_serv = ""
+if 'preco_valor' not in st.session_state:
+    st.session_state.preco_valor = 0.0
 
 # LOGIN
 if st.session_state.pagina == "login":
@@ -563,7 +577,6 @@ else:
     elif st.session_state.pagina == "pesquisa_veiculos":
         st.header("Pesquisa de Veículos")
 
-        # IMPORTAÇÃO EM MASSA (CSV)
         with st.expander("IMPORTAR VEÍCULOS (CSV)", expanded=False):
             col1, col2 = st.columns([3, 1])
             uploaded_file = col1.file_uploader("Escolha o arquivo CSV", type=['csv'], key="import_veic_csv")
@@ -591,7 +604,6 @@ else:
                 except Exception as e:
                     st.error(f"Erro: {e}")
 
-            # TEMPLATE CSV
             csv_template = """PLACA,TIPO DO VEÍCULO,MODELO/MARCA
 ABC1D23,TRUCK,Scania R450
 XYZ9E87,CONJUNTO BITREM,Volvo FH
@@ -601,12 +613,71 @@ XYZ9E87,CONJUNTO BITREM,Volvo FH
         st.markdown("---")
         df = listar_veiculos()
         if not df.empty:
-            # ... (mesmo código de listagem de veículos)
-            pass  # (mantenha o código original de listagem)
+            header_cols = st.columns([2, 2.5, 2.5, 2, 1.5])
+            header_cols[0].write("**Placa**")
+            header_cols[1].write("**Tipo do Veículo**")
+            header_cols[2].write("**Modelo/Marca**")
+            header_cols[3].write("**Data Cadastro**")
+            header_cols[4].write("**Ações**")
+            st.markdown("---")
+
+            for _, row in df.iterrows():
+                cols = st.columns([2, 2.5, 2.5, 2, 1.5])
+                cols[0].write(row['placa'])
+                cols[1].write(row['tipo'])
+                cols[2].write(row['modelo_marca'] or "-")
+                cols[3].write(row['data_cadastro'])
+                
+                with cols[4]:
+                    col_edit, col_del = st.columns(2)
+                    with col_edit:
+                        if st.button("Editar", key=f"edit_veic_{row['id']}"):
+                            st.session_state.editando_veiculo = row['id']
+                            st.rerun()
+                    with col_del:
+                        if st.button("Excluir", key=f"del_veic_{row['id']}"):
+                            if st.session_state.get('confirmar_exclusao_veiculo') == row['id']:
+                                excluir_veiculo(row['id'])
+                                st.success("Veículo excluído!")
+                                if 'confirmar_exclusao_veiculo' in st.session_state:
+                                    del st.session_state.confirmar_exclusao_veiculo
+                                st.rerun()
+                            else:
+                                st.session_state.confirmar_exclusao_veiculo = row['id']
+                                st.warning("Clique novamente para confirmar.")
+                                st.rerun()
+
+            if st.session_state.editando_veiculo:
+                veic_df = df[df['id'] == st.session_state.editando_veiculo]
+                if not veic_df.empty:
+                    veic = veic_df.iloc[0]
+                    st.markdown("---")
+                    st.subheader(f"Editando: {veic['placa']}")
+                    with st.form("editar_veiculo"):
+                        nova_placa = st.text_input("PLACA", value=veic['placa'], max_chars=7).upper()
+                        novo_tipo = st.selectbox("**TIPO DO VEÍCULO**", TIPOS_VEICULO,
+                                                index=TIPOS_VEICULO.index(veic['tipo']) if veic['tipo'] in TIPOS_VEICULO else 0)
+                        novo_modelo = st.text_input("MODELO/MARCA", value=veic['modelo_marca'] or "", max_chars=30)
+                        col1, col2 = st.columns(2)
+                        if col1.form_submit_button("Salvar"):
+                            if len(nova_placa) == 7 and re.match(r"^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$", nova_placa):
+                                if editar_veiculo(st.session_state.editando_veiculo, nova_placa, novo_tipo, novo_modelo):
+                                    st.success("Atualizado!")
+                                    del st.session_state.editando_veiculo
+                                    st.rerun()
+                                else:
+                                    st.error("Placa já existe!")
+                            else:
+                                st.error("Placa inválida!")
+                        if col2.form_submit_button("Cancelar"):
+                            del st.session_state.editando_veiculo
+                            st.rerun()
+
+            df_display = df[['placa', 'tipo', 'modelo_marca', 'data_cadastro']].copy()
+            st.download_button("Baixar CSV", df_display.to_csv(index=False).encode('utf-8'), "veiculos.csv", "text/csv")
         else:
             st.info("Nenhum veículo cadastrado.")
 
-    # CADASTRO DE FORNECEDOR
     elif st.session_state.pagina == "cadastro_fornecedor":
         st.header("Cadastrar Fornecedor")
         with st.form("novo_fornecedor"):
@@ -623,7 +694,6 @@ XYZ9E87,CONJUNTO BITREM,Volvo FH
                 else:
                     st.error("Preencha Lavador e CNPJ!")
 
-    # PESQUISA DE FORNECEDORES
     elif st.session_state.pagina == "pesquisa_fornecedores":
         st.header("Pesquisa de Fornecedores")
 
@@ -663,7 +733,6 @@ XYZ9E87,CONJUNTO BITREM,Volvo FH
                                 st.session_state.confirmar_exclusao_forn = row['id']
                                 st.warning("Clique novamente para confirmar.")
 
-            # EDIÇÃO
             if st.session_state.editando_fornecedor:
                 forn_df = df[df['id'] == st.session_state.editando_fornecedor]
                 if not forn_df.empty:
@@ -689,7 +758,7 @@ XYZ9E87,CONJUNTO BITREM,Volvo FH
             # TABELA DE PREÇOS
             st.markdown("---")
             st.subheader("Tabela de Preços por Fornecedor")
-            fornecedor_selecionado = st.selectbox("Selecione o Fornecedor", [""] + df['lavador'].tolist())
+            fornecedor_selecionado = st.selectbox("Selecione o Fornecedor", [""] + df['lavador'].tolist(), key="select_forn_preco")
             if fornecedor_selecionado:
                 forn_id = df[df['lavador'] == fornecedor_selecionado].iloc[0]['id']
                 st.session_state.fornecedor_precos = forn_id
@@ -697,9 +766,9 @@ XYZ9E87,CONJUNTO BITREM,Volvo FH
 
                 with st.expander("Adicionar Novo Preço", expanded=False):
                     with st.form("novo_preco"):
-                        tipo = st.selectbox("Tipo de Veículo", TIPOS_VEICULO)
-                        serv = st.selectbox("Serviço", SERVICOS)
-                        valor = st.number_input("Valor (R$)", min_value=0.01, step=5.0)
+                        tipo = st.selectbox("Tipo de Veículo", TIPOS_VEICULO, key="novo_tipo")
+                        serv = st.selectbox("Serviço", SERVICOS, key="novo_serv")
+                        valor = st.number_input("Valor (R$)", min_value=0.01, step=5.0, format="%.2f", key="novo_valor")
                         if st.form_submit_button("Adicionar"):
                             if adicionar_preco(forn_id, tipo, serv, valor):
                                 st.success("Preço adicionado!")
@@ -708,20 +777,77 @@ XYZ9E87,CONJUNTO BITREM,Volvo FH
                                 st.error("Erro ao adicionar.")
 
                 if not precos_df.empty:
-                    for _, row in precos_df.iterrows():
-                        col1, col2, col3, col4 = st.columns([2, 2.5, 1.5, 1.5])
+                    st.write("**Preços Cadastrados:**")
+                    for idx, row in precos_df.iterrows():
+                        col1, col2, col3, col4 = st.columns([2, 3, 1.5, 2])
                         col1.write(row['tipo_veiculo'])
                         col2.write(row['servico'])
                         col3.write(f"R$ {row['valor']:.2f}")
-                        with col4:
-                            if st.button("Excluir", key=f"del_preco_{row['id']}"):
-                                excluir_preco(row['id'])
-                                st.success("Preço removido!")
-                                st.rerun()
-                else:
-                    st.info("Nenhum preço cadastrado.")
 
-            st.download_button("Baixar Fornecedores (CSV)", df.to_csv(index=False).encode('utf-8'), "fornecedores.csv", "text/csv")
+                        with col4:
+                            col_edit, col_del = st.columns(2)
+                            with col_edit:
+                                if st.button("Editar", key=f"edit_preco_{row['id']}"):
+                                    st.session_state.editando_preco = row['id']
+                                    st.session_state.preco_tipo = row['tipo_veiculo']
+                                    st.session_state.preco_serv = row['servico']
+                                    st.session_state.preco_valor = row['valor']
+                                    st.rerun()
+                            with col_del:
+                                if st.button("Excluir", key=f"del_preco_{row['id']}"):
+                                    excluir_preco(row['id'])
+                                    st.success("Preço removido!")
+                                    st.rerun()
+
+                    if st.session_state.get('editando_preco'):
+                        preco_id = st.session_state.editando_preco
+                        with st.form("editar_preco_form"):
+                            st.write("**Editando Preço**")
+                            tipo_edit = st.selectbox(
+                                "Tipo de Veículo",
+                                TIPOS_VEICULO,
+                                index=TIPOS_VEICULO.index(st.session_state.preco_tipo) if st.session_state.preco_tipo in TIPOS_VEICULO else 0,
+                                key="edit_tipo"
+                            )
+                            serv_edit = st.selectbox(
+                                "Serviço",
+                                SERVICOS,
+                                index=SERVICOS.index(st.session_state.preco_serv) if st.session_state.preco_serv in SERVICOS else 0,
+                                key="edit_serv"
+                            )
+                            valor_edit = st.number_input(
+                                "Valor (R$)",
+                                min_value=0.01,
+                                value=float(st.session_state.preco_valor),
+                                step=5.0,
+                                format="%.2f",
+                                key="edit_valor"
+                            )
+                            col1, col2 = st.columns(2)
+                            if col1.form_submit_button("Salvar Alterações"):
+                                if editar_preco(preco_id, tipo_edit, serv_edit, valor_edit):
+                                    st.success("Preço atualizado!")
+                                    for key in ['editando_preco', 'preco_tipo', 'preco_serv', 'preco_valor']:
+                                        if key in st.session_state:
+                                            del st.session_state[key]
+                                    st.rerun()
+                                else:
+                                    st.error("Erro ao salvar.")
+                            if col2.form_submit_button("Cancelar"):
+                                for key in ['editando_preco', 'preco_tipo', 'preco_serv', 'preco_valor']:
+                                    if key in st.session_state:
+                                        del st.session_state[key]
+                                st.rerun()
+
+                else:
+                    st.info("Nenhum preço cadastrado para este fornecedor.")
+
+            st.download_button(
+                "Baixar Fornecedores (CSV)",
+                df.to_csv(index=False).encode('utf-8'),
+                "fornecedores.csv",
+                "text/csv"
+            )
         else:
             st.info("Nenhum fornecedor cadastrado.")
 
