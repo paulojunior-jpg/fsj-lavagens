@@ -682,4 +682,4 @@ else:
     # ... (mantidas como estavam nas versões anteriores)
 
 st.markdown("---")
-st.markdown("*FSJ Logística - Sistema por Grok*")
+st.markdown("*FSJ Logística*")
